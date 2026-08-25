@@ -1,0 +1,30 @@
+/vendor/
+/build/
+/.phpunit.cache/
+/.phpunit.result.cache
+/.phpunit.sandbox.cache/
+/composer.lock
+
+# Local credentials and environment overrides
+/.env
+/.env.*
+!/.env.example
+/auth.json
+
+# Local PHPUnit and IDE overrides
+/phpunit.xml
+/phpunit.sandbox.xml
+/.idea/
+/.vscode/
+.DS_Store
+
+# Temporary reports and scratch files
+/SCRATCH.md
+/REPOSITORY_COMPARISON.md
+/reference-repositories/
+/docs/plans/
+/docs/reports/*
+!/docs/reports/analysis/
+/docs/reports/analysis/*
+!/docs/reports/analysis/report-document.css
+!/docs/reports/analysis/report-document.js
