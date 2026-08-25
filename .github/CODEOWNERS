@@ -1,0 +1,11 @@
+# Security-sensitive package and release surfaces
+/.github/CODEOWNERS @cieplik206
+/.github/workflows/ @cieplik206
+/composer.json @cieplik206
+/.gitignore @cieplik206
+/CHANGELOG.md @cieplik206
+/SECURITY.md @cieplik206
+
+# Package implementation and Laravel integration
+/src/ @cieplik206
+/config/ @cieplik206

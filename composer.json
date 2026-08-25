@@ -1,0 +1,77 @@
+{
+    "name": "cieplik206/laravel-fakturownia-client",
+    "description": "Laravel client for the Fakturownia (InvoiceOcean) REST API",
+    "keywords": [
+        "api-client",
+        "fakturownia",
+        "invoiceocean",
+        "ksef",
+        "laravel",
+        "saloon",
+        "php"
+    ],
+    "homepage": "https://github.com/cieplik206/laravel-fakturownia-client",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Paweł Ciepliński",
+            "homepage": "https://github.com/cieplik206",
+            "role": "Developer"
+        }
+    ],
+    "support": {
+        "docs": "https://github.com/cieplik206/laravel-fakturownia-client#readme",
+        "issues": "https://github.com/cieplik206/laravel-fakturownia-client/issues",
+        "security": "https://github.com/cieplik206/laravel-fakturownia-client/security/policy",
+        "source": "https://github.com/cieplik206/laravel-fakturownia-client"
+    },
+    "require": {
+        "ext-curl": "*",
+        "ext-json": "*",
+        "php": "^8.2",
+        "illuminate/contracts": "^11.0 || ^12.0 || ^13.0",
+        "illuminate/support": "^11.0 || ^12.0 || ^13.0",
+        "saloonphp/laravel-plugin": "^4.0",
+        "saloonphp/saloon": "^4.0",
+        "spatie/laravel-data": "^4.11"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.0",
+        "laravel/pint": "^1.0",
+        "orchestra/testbench": "^9.0 || ^10.0 || ^11.0",
+        "pestphp/pest": "^5.0",
+        "pestphp/pest-plugin-laravel": "^5.0",
+        "pestphp/pest-plugin-phpstan": "^5.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "cieplik206\\Fakturownia\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "cieplik206\\Fakturownia\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "cieplik206\\Fakturownia\\FakturowniaServiceProvider"
+            ]
+        }
+    },
+    "scripts": {
+        "test": "pest",
+        "analyse": "phpstan analyse",
+        "format": "pint src tests"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        },
+        "sort-packages": true
+    }
+}

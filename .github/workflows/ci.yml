@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - '**'
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: '8.5'
+          coverage: none
+          tools: composer:v2
+
+      - name: Validate Composer metadata
+        run: composer validate --strict --no-check-publish
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction --no-progress
+
+      - name: Check code style
+        run: vendor/bin/pint --test src tests
+
+      - name: Run static analysis
+        run: vendor/bin/phpstan analyse --no-progress
+
+      - name: Run tests
+        run: composer test
+
+      - name: Audit dependencies
+        run: composer audit
+
+  tests:
+    name: Tests (Laravel ${{ matrix.laravel }}, PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - laravel: '11'
+            testbench: '^9.0'
+            php: '8.2'
+          - laravel: '12'
+            testbench: '^10.0'
+            php: '8.3'
+          - laravel: '13'
+            testbench: '^11.0'
+            php: '8.4'
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30af803 # v6.1.0
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+          tools: composer:v2
+
+      - name: Install Laravel ${{ matrix.laravel }} dependencies
+        run: >
+          composer update
+          --with "orchestra/testbench:${{ matrix.testbench }}"
+          --prefer-dist --no-interaction --no-progress
+
+      - name: Run tests
+        run: composer test
+
+  passed:
+    name: CI Passed
+    if: always()
+    needs:
+      - quality
+      - tests
+    runs-on: ubuntu-slim
+    timeout-minutes: 2
+
+    steps:
+      - name: Verify all CI jobs passed
+        env:
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          TESTS_RESULT: ${{ needs.tests.result }}
+        run: |
+          test "$QUALITY_RESULT" = success
+          test "$TESTS_RESULT" = success
