@@ -7,6 +7,41 @@ Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- Add the explicit `fakturownia.invoice.ksef.ensure_accepted` operation with
+  disjoint SDK-send and provider-auto ownership profiles, deadline polling,
+  lost-response reconciliation, and a hard one-write budget.
+- Persist typed current KSeF state and append-only observation history in the
+  same PostgreSQL transaction as operation outcomes.
+- Dispatch the semantic `InvoiceKsefAccepted` event and expose
+  connection-scoped KSeF state queries.
+
+### Changed
+
+- Require `cieplik206/laravel-integration-operations` 0.3.4 so a reconciled,
+  externally started KSeF send can safely return to observation polling.
+
+## [0.1.5] - 2026-08-26
+
+### Fixed
+
+- Trust copied runtime extension fixtures without weakening pre-autoload
+  integrity verification.
+
+## [0.1.4] - 2026-08-26
+
+### Fixed
+
+- Make security fixtures independent of the local test runner path.
+
+## [0.1.3] - 2026-08-26
+
+### Fixed
+
+- Resolve the trusted pre-autoload fixture root independently of the current
+  working directory.
+
 ## [0.1.2] - 2026-08-26
 
 ### Fixed

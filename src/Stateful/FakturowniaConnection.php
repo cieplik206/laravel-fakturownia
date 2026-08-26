@@ -10,6 +10,8 @@ use Cieplik206\Fakturownia\Read\Administration\AdministrationReadScope;
 use Cieplik206\Fakturownia\Read\Data\AccountInvoiceListQuery;
 use Cieplik206\Fakturownia\Read\Data\AccountInvoiceReadPage;
 use Cieplik206\Fakturownia\Read\FakturowniaReadClient;
+use Cieplik206\Fakturownia\Stateful\Ksef\InvoiceKsefStateQuery;
+use Cieplik206\Fakturownia\Stateful\Ksef\Operations\Contracts\KsefStateReader;
 use Cieplik206\IntegrationOperations\Contracts\OperationQuery;
 use Cieplik206\IntegrationOperations\ValueObjects\ConnectionKey;
 use JsonSerializable;
@@ -28,6 +30,7 @@ final readonly class FakturowniaConnection implements JsonSerializable
         public DeploymentStage $deploymentStage,
         #[SensitiveParameter] FakturowniaClient $client,
         private ?OperationQuery $operationQuery = null,
+        private ?KsefStateReader $ksefStateReader = null,
     ) {
         $this->key = new SensitiveParameterValue($key);
         $this->client = new SensitiveParameterValue($client);
@@ -56,6 +59,15 @@ final readonly class FakturowniaConnection implements JsonSerializable
         }
 
         return new FakturowniaOperations($this->key(), $this->operationQuery);
+    }
+
+    public function ksefStates(): InvoiceKsefStateQuery
+    {
+        if (! $this->ksefStateReader instanceof KsefStateReader) {
+            throw new LogicException('KSeF state query is unavailable for this Fakturownia connection.');
+        }
+
+        return new InvoiceKsefStateQuery($this->key(), $this->ksefStateReader);
     }
 
     public function accountInvoices(

@@ -8,6 +8,7 @@ use Cieplik206\Fakturownia\Client\Contracts\ClientFactory;
 use Cieplik206\Fakturownia\Stateful\Contracts\ConnectionResolver;
 use Cieplik206\Fakturownia\Stateful\Exceptions\ConnectionConfigurationInvalid;
 use Cieplik206\Fakturownia\Stateful\Exceptions\ConnectionConfigurationReason;
+use Cieplik206\Fakturownia\Stateful\Ksef\Operations\Contracts\KsefStateReader;
 use Cieplik206\IntegrationOperations\Contracts\OperationQuery;
 use Cieplik206\IntegrationOperations\ValueObjects\ConnectionKey;
 use JsonSerializable;
@@ -23,14 +24,18 @@ final readonly class FakturowniaManager implements JsonSerializable
 
     private ?OperationQuery $operationQuery;
 
+    private ?KsefStateReader $ksefStateReader;
+
     public function __construct(
         #[SensitiveParameter] ConnectionResolver $connectionResolver,
         #[SensitiveParameter] ClientFactory $clientFactory,
         ?OperationQuery $operationQuery = null,
+        ?KsefStateReader $ksefStateReader = null,
     ) {
         $this->connectionResolver = new SensitiveParameterValue($connectionResolver);
         $this->clientFactory = new SensitiveParameterValue($clientFactory);
         $this->operationQuery = $operationQuery;
+        $this->ksefStateReader = $ksefStateReader;
     }
 
     public function connection(#[SensitiveParameter] ConnectionKey $connectionKey): FakturowniaConnection
@@ -46,6 +51,7 @@ final readonly class FakturowniaManager implements JsonSerializable
             $profile->deploymentStage,
             $profile->createClient($this->clientFactory()),
             $this->operationQuery,
+            $this->ksefStateReader,
         );
     }
 

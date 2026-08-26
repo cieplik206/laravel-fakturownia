@@ -62,6 +62,7 @@ it('owns the exact package migrations without ConnectionKey duplication or boot 
             packageRoot().'/database/migrations/2026_08_26_000002_create_fakturownia_webhook_receipts_table.php',
             packageRoot().'/database/migrations/2026_08_26_000003_create_fakturownia_resources_table.php',
             packageRoot().'/database/migrations/2026_08_26_000004_create_fakturownia_sync_checkpoints_table.php',
+            packageRoot().'/database/migrations/2026_08_26_000005_create_fakturownia_invoice_ksef_states_table.php',
         ])
         ->and(hash_file('sha256', packageRoot().'/database/migrations/2026_08_26_000001_create_fakturownia_artifacts_table.php'))
         ->toBe('b757e6005b4c30bb1e53c5bb6130bdd280cc4367b0d9f07c64b89ff56a9f12ad')
@@ -71,6 +72,8 @@ it('owns the exact package migrations without ConnectionKey duplication or boot 
         ->toBe('6cb9fb9ec2ea7adc21016f6007fe1f44d15b0958cfbe26871071dbacc0dfcee8')
         ->and(hash_file('sha256', packageRoot().'/database/migrations/2026_08_26_000004_create_fakturownia_sync_checkpoints_table.php'))
         ->toBe('8879741084aae47b441d4a735bf5a2a0d5b764ce8e824ea8dbea945e7ee40481')
+        ->and(hash_file('sha256', packageRoot().'/database/migrations/2026_08_26_000005_create_fakturownia_invoice_ksef_states_table.php'))
+        ->toBe('b2527ec9ed2187c91e29c93ed4654f7750a7ef8afb8d00f2a8820e24199ecc77')
         ->and($provider)->not->toBeFalse()
         ->and($provider)->toContain("\$this->loadMigrationsFrom(__DIR__.'/../../database/migrations');")
         ->and($provider)->not->toContain('Http::')
@@ -85,7 +88,7 @@ it('declares the renamed package discovery and kernel dependency', function (): 
     expect($composer)->toBeArray()
         ->and($composer['name'] ?? null)->toBe('cieplik206/laravel-fakturownia')
         ->and($composer['replace']['cieplik206/laravel-fakturownia-client'] ?? null)->toBe('self.version')
-        ->and($composer['require']['cieplik206/laravel-integration-operations'] ?? null)->toBe('^0.3')
+        ->and($composer['require']['cieplik206/laravel-integration-operations'] ?? null)->toBe('^0.3.4')
         ->and($composer['extra']['laravel']['providers'] ?? [])->toContain(
             'Cieplik206\\Fakturownia\\Laravel\\FakturowniaServiceProvider',
         );
@@ -117,7 +120,7 @@ it('keeps the complete public and Saloon dispatch surface closed behind the RT-3
         ->and(dynamicToolingCallSiteErrors($methodInventory))->toBe([])
         ->and($classificationCounts)->toBe([
             'capability_contract:invoice.correction.issue' => 29,
-            'capability_contract:invoice.ksef.ensure_accepted' => 39,
+            'capability_contract:invoice.ksef.ensure_accepted' => 112,
             'capability_contract:invoice.pdf.download' => 123,
             'capability_contract:invoice.vat.issue' => 151,
             'contract_tooling' => 116,
@@ -131,7 +134,7 @@ it('keeps the complete public and Saloon dispatch surface closed behind the RT-3
             'testing_no_io' => 48,
         ])
         ->and(hash_file('sha256', publicMethodInventoryPath()))
-        ->toBe('d291004dd5c5d29cfff5adc96bac6469a4eac4b393c6f707251fcb0224e0df71');
+        ->toBe('eff95a0d00618563afc118cd3659cb18c1712c12999fb7ff9091a5686dd444b2');
 
     $statuses = capabilityStatuses($matrix);
 

@@ -27,11 +27,11 @@
         "source": "https://github.com/cieplik206/laravel-fakturownia"
     },
     "require": {
+        "php": "^8.4",
         "ext-curl": "*",
         "ext-json": "*",
         "ext-sodium": "*",
-        "php": "^8.4",
-        "cieplik206/laravel-integration-operations": "^0.3",
+        "cieplik206/laravel-integration-operations": "^0.3.4",
         "illuminate/cache": "^13.17",
         "illuminate/console": "^13.17",
         "illuminate/contracts": "^13.0",

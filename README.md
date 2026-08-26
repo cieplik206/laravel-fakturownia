@@ -21,10 +21,13 @@ Runtime `deployment_stage` is only consumer deployment metadata. In particular,
 `non_production` never means DEMO evidence and cannot enable a capability;
 `demo_pl`, `demo_regional`, and `ksef_demo` belong exclusively to signed contract
 probe artifacts and are rejected by runtime connection configuration.
-The package deliberately registers only its no-I/O diagnostic operation until
-the managed-write contracts are released. Installing or booting it cannot
-trigger HTTP, queue work, or database migrations. Typed remote reads and
-managed-write contracts existing in source do not become runtime authority by
+The package registers its diagnostic and versioned stateful operation
+definitions, but every remote write transport is disabled by default. A
+consumer must bind a reviewed transport adapter before an operation can cross
+its effect boundary. Installing or booting the package cannot trigger HTTP,
+queue work, or database migrations; package migrations are only discovered for
+the consumer's normal migration workflow. Typed remote reads and managed-write
+contracts existing in source do not become remote-write authority by
 themselves.
 
 ## Requirements
@@ -157,6 +160,50 @@ $snapshot = $operations->find(new OperationId('01J00000000000000000000000'));
 The wrapper delegates to the kernel's shared `OperationQuery` and always adds
 the exact `fakturownia` provider plus selected connection scope. It is not a
 second state store and cannot read another connection's operations.
+
+## Stateful KSeF acceptance
+
+KSeF acceptance is an explicit operation separate from invoice issue. Build an
+`EnsureAcceptedCommand` from the persisted invoice resource, freeze the
+connection profile, and pass the resulting intent to the shared operation
+coordinator. `ExplicitSdk` may cross the effect boundary at most once;
+`ProviderAutoSend` is permanently observe-only.
+
+```php
+use Cieplik206\Fakturownia\Stateful\Ksef\KsefConnectionProfile;
+use Cieplik206\Fakturownia\Stateful\Ksef\KsefValidationMode;
+use Cieplik206\Fakturownia\Stateful\Ksef\Operations\EnsureAcceptedCommand;
+use Cieplik206\Fakturownia\Stateful\Ksef\Operations\EnsureAcceptedOperationFactory;
+use Cieplik206\IntegrationOperations\Context\IntegrationContext;
+use Cieplik206\IntegrationOperations\Contracts\OperationCoordinator;
+
+$profile = KsefConnectionProfile::explicitSdk(
+    $connectionFingerprintSha256,
+    KsefValidationMode::BlockInvalid,
+);
+
+$intent = app(EnsureAcceptedOperationFactory::class)->make(
+    new EnsureAcceptedCommand($connectionKey, $resourceId, $remoteId, $profile),
+    IntegrationContext::make($workflowId),
+);
+
+$receipt = app(OperationCoordinator::class)->accept($intent);
+```
+
+The authoritative definition starts with a read-only preflight, polls until a
+terminal status or deadline, and reconciles a lost send response through
+read-only observations. A started but nonterminal send returns to polling and
+never authorizes another send. Accepted, rejected, overdue, unknown, offline,
+and configuration-blocked observations are persisted in the provider-owned
+KSeF state and append-only history tables in the kernel transaction.
+
+Consumers can read the typed state through
+`$connection->ksefStates()->find($resourceId)`. A terminal accepted result also
+dispatches `InvoiceKsefAccepted`; XML and UPO remain separate read-only streams
+and are not part of the acceptance gate. The built-in `KsefSendTransport` is a
+fail-closed disabled adapter. Binding an application adapter must include the
+reviewed connection-settings preflight and must call the supplied effect
+boundary immediately before the single remote write.
 
 The stateful package also contains local sync-integrity contracts for later
 master-data lanes. `SnapshotAttestor` creates versioned HMACs separated by the
