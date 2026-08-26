@@ -31,7 +31,7 @@
         "ext-curl": "*",
         "ext-json": "*",
         "ext-sodium": "*",
-        "cieplik206/laravel-integration-operations": "^0.3.4",
+        "cieplik206/laravel-integration-operations": "^0.3.5",
         "illuminate/cache": "^13.17",
         "illuminate/console": "^13.17",
         "illuminate/contracts": "^13.0",

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Cieplik206\Fakturownia\Stateful;
 
 use Cieplik206\Fakturownia\Client\Contracts\ClientFactory;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Contracts\ArtifactDescriptorReader;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Contracts\ContentAddressedArtifactStore;
 use Cieplik206\Fakturownia\Stateful\Contracts\ConnectionResolver;
 use Cieplik206\Fakturownia\Stateful\Exceptions\ConnectionConfigurationInvalid;
 use Cieplik206\Fakturownia\Stateful\Exceptions\ConnectionConfigurationReason;
@@ -26,16 +28,24 @@ final readonly class FakturowniaManager implements JsonSerializable
 
     private ?KsefStateReader $ksefStateReader;
 
+    private ?ArtifactDescriptorReader $artifactDescriptorReader;
+
+    private ?ContentAddressedArtifactStore $artifactStore;
+
     public function __construct(
         #[SensitiveParameter] ConnectionResolver $connectionResolver,
         #[SensitiveParameter] ClientFactory $clientFactory,
         ?OperationQuery $operationQuery = null,
         ?KsefStateReader $ksefStateReader = null,
+        ?ArtifactDescriptorReader $artifactDescriptorReader = null,
+        ?ContentAddressedArtifactStore $artifactStore = null,
     ) {
         $this->connectionResolver = new SensitiveParameterValue($connectionResolver);
         $this->clientFactory = new SensitiveParameterValue($clientFactory);
         $this->operationQuery = $operationQuery;
         $this->ksefStateReader = $ksefStateReader;
+        $this->artifactDescriptorReader = $artifactDescriptorReader;
+        $this->artifactStore = $artifactStore;
     }
 
     public function connection(#[SensitiveParameter] ConnectionKey $connectionKey): FakturowniaConnection
@@ -52,6 +62,8 @@ final readonly class FakturowniaManager implements JsonSerializable
             $profile->createClient($this->clientFactory()),
             $this->operationQuery,
             $this->ksefStateReader,
+            $this->artifactDescriptorReader,
+            $this->artifactStore,
         );
     }
 

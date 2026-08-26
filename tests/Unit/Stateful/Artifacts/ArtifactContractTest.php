@@ -53,8 +53,12 @@ function s61NamedReturnType(ReflectionMethod $method): ReflectionNamedType
 
 final class S61LiteralArtifactContentStream extends ArtifactContentStream
 {
+    private int $readCount = 0;
+
     public function read(int $maximumBytes): string
     {
+        $this->readCount++;
+
         return '';
     }
 

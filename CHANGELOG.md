@@ -16,11 +16,18 @@ Versioning.
   same PostgreSQL transaction as operation outcomes.
 - Dispatch the semantic `InvoiceKsefAccepted` event and expose
   connection-scoped KSeF state queries.
+- Add the durable `fakturownia.invoice.pdf.download` operation with bounded PDF
+  staging, immutable SHA-256 addressing, one-write execution, and read-only
+  lost-response reconciliation.
+- Persist connection-scoped artifact descriptors with versioned AES-256-GCM
+  metadata, expose integrity-checked artifact streams, and dispatch
+  `InvoicePdfReady` only after descriptor and object projection agree.
 
 ### Changed
 
-- Require `cieplik206/laravel-integration-operations` 0.3.4 so a reconciled,
-  externally started KSeF send can safely return to observation polling.
+- Require `cieplik206/laravel-integration-operations` 0.3.5 so a reconciled,
+  externally started KSeF send can safely return to observation polling and
+  canonical transport contracts can represent fixed endpoint suffixes.
 
 ## [0.1.5] - 2026-08-26
 

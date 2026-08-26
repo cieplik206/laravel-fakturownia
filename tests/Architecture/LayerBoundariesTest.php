@@ -88,7 +88,7 @@ it('declares the renamed package discovery and kernel dependency', function (): 
     expect($composer)->toBeArray()
         ->and($composer['name'] ?? null)->toBe('cieplik206/laravel-fakturownia')
         ->and($composer['replace']['cieplik206/laravel-fakturownia-client'] ?? null)->toBe('self.version')
-        ->and($composer['require']['cieplik206/laravel-integration-operations'] ?? null)->toBe('^0.3.4')
+        ->and($composer['require']['cieplik206/laravel-integration-operations'] ?? null)->toBe('^0.3.5')
         ->and($composer['extra']['laravel']['providers'] ?? [])->toContain(
             'Cieplik206\\Fakturownia\\Laravel\\FakturowniaServiceProvider',
         );
@@ -121,7 +121,7 @@ it('keeps the complete public and Saloon dispatch surface closed behind the RT-3
         ->and($classificationCounts)->toBe([
             'capability_contract:invoice.correction.issue' => 29,
             'capability_contract:invoice.ksef.ensure_accepted' => 112,
-            'capability_contract:invoice.pdf.download' => 123,
+            'capability_contract:invoice.pdf.download' => 253,
             'capability_contract:invoice.vat.issue' => 151,
             'contract_tooling' => 116,
             'deferred_capability_contract:invoice.proforma.issue' => 9,
@@ -134,7 +134,7 @@ it('keeps the complete public and Saloon dispatch surface closed behind the RT-3
             'testing_no_io' => 48,
         ])
         ->and(hash_file('sha256', publicMethodInventoryPath()))
-        ->toBe('eff95a0d00618563afc118cd3659cb18c1712c12999fb7ff9091a5686dd444b2');
+        ->toBe('a31a818026edb5af59a514b727ff8f4d342dd189bf05b22280c1098b63d5f018');
 
     $statuses = capabilityStatuses($matrix);
 

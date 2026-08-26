@@ -10,6 +10,9 @@ use Cieplik206\Fakturownia\Read\Administration\AdministrationReadScope;
 use Cieplik206\Fakturownia\Read\Data\AccountInvoiceListQuery;
 use Cieplik206\Fakturownia\Read\Data\AccountInvoiceReadPage;
 use Cieplik206\Fakturownia\Read\FakturowniaReadClient;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Contracts\ArtifactDescriptorReader;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Contracts\ContentAddressedArtifactStore;
+use Cieplik206\Fakturownia\Stateful\Artifacts\InvoiceArtifactQuery;
 use Cieplik206\Fakturownia\Stateful\Ksef\InvoiceKsefStateQuery;
 use Cieplik206\Fakturownia\Stateful\Ksef\Operations\Contracts\KsefStateReader;
 use Cieplik206\IntegrationOperations\Contracts\OperationQuery;
@@ -31,6 +34,8 @@ final readonly class FakturowniaConnection implements JsonSerializable
         #[SensitiveParameter] FakturowniaClient $client,
         private ?OperationQuery $operationQuery = null,
         private ?KsefStateReader $ksefStateReader = null,
+        private ?ArtifactDescriptorReader $artifactDescriptorReader = null,
+        private ?ContentAddressedArtifactStore $artifactStore = null,
     ) {
         $this->key = new SensitiveParameterValue($key);
         $this->client = new SensitiveParameterValue($client);
@@ -68,6 +73,16 @@ final readonly class FakturowniaConnection implements JsonSerializable
         }
 
         return new InvoiceKsefStateQuery($this->key(), $this->ksefStateReader);
+    }
+
+    public function artifacts(): InvoiceArtifactQuery
+    {
+        if (! $this->artifactDescriptorReader instanceof ArtifactDescriptorReader
+            || ! $this->artifactStore instanceof ContentAddressedArtifactStore) {
+            throw new LogicException('Artifact query is unavailable for this Fakturownia connection.');
+        }
+
+        return new InvoiceArtifactQuery($this->key(), $this->artifactDescriptorReader, $this->artifactStore);
     }
 
     public function accountInvoices(

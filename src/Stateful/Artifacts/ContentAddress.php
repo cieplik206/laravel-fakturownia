@@ -39,6 +39,11 @@ final readonly class ContentAddress implements Stringable
         return $this->sha256;
     }
 
+    public function equals(self $other): bool
+    {
+        return hash_equals($this->sha256, $other->sha256);
+    }
+
     public function __toString(): string
     {
         return self::Prefix.$this->sha256;

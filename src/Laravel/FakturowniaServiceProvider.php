@@ -6,6 +6,13 @@ namespace Cieplik206\Fakturownia\Laravel;
 
 use Cieplik206\Fakturownia\Client\Contracts\ClientFactory;
 use Cieplik206\Fakturownia\Client\DefaultClientFactory;
+use Cieplik206\Fakturownia\Laravel\Artifacts\AesGcmArtifactMetadataProtector;
+use Cieplik206\Fakturownia\Laravel\Artifacts\CacheArtifactAddressLock;
+use Cieplik206\Fakturownia\Laravel\Artifacts\ConfigInvoicePdfConfiguration;
+use Cieplik206\Fakturownia\Laravel\Artifacts\DatabaseArtifactStore;
+use Cieplik206\Fakturownia\Laravel\Artifacts\DispatchInvoicePdfReady;
+use Cieplik206\Fakturownia\Laravel\Artifacts\FakturowniaInvoicePdfSourceReader;
+use Cieplik206\Fakturownia\Laravel\Artifacts\FilesystemContentAddressedArtifactStore;
 use Cieplik206\Fakturownia\Laravel\Console\InstallFakturowniaCommand;
 use Cieplik206\Fakturownia\Laravel\Contracts\ConfigurationPublisher;
 use Cieplik206\Fakturownia\Laravel\Ksef\DatabaseKsefStateProjectionStore;
@@ -13,6 +20,28 @@ use Cieplik206\Fakturownia\Laravel\Ksef\DispatchInvoiceKsefAccepted;
 use Cieplik206\Fakturownia\Laravel\Reconciliation\ConfigInvoiceReconciliationConfiguration;
 use Cieplik206\Fakturownia\Laravel\Resources\DatabaseInvoiceResourceStore;
 use Cieplik206\Fakturownia\Laravel\Resources\SodiumInvoiceResourceSnapshotProtector;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Contracts\ArtifactDescriptorReader;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Contracts\ArtifactMetadataProtector;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Contracts\ArtifactProjectionStore;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Contracts\ContentAddressedArtifactStore;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Maintenance\Contracts\ArtifactAddressLock;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\AuthoritativeDownloadInvoicePdfFailureClassifier;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\AuthoritativeDownloadInvoicePdfOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\AuthoritativeDownloadInvoicePdfReconciliationStrategy;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\AuthoritativeDownloadInvoicePdfRetryPolicy;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\Contracts\InvoicePdfConfiguration;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\Contracts\InvoicePdfSourceReader;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\DownloadInvoicePdfFailureClassifier;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\DownloadInvoicePdfOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\DownloadInvoicePdfOperationFactory;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\DownloadInvoicePdfOperationHandler;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\DownloadInvoicePdfPayloadCodec;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\DownloadInvoicePdfReconciliationStrategy;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\DownloadInvoicePdfRetryPolicy;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\InvoicePdfOutcomeProjectionPlanner;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\InvoicePdfOutcomeProjector;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\InvoicePdfReadyResultCodec;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\InvoicePdfStager;
 use Cieplik206\Fakturownia\Stateful\Contracts\ConnectionResolver;
 use Cieplik206\Fakturownia\Stateful\Diagnostics\FakturowniaDiagnosticDefinitionProvider;
 use Cieplik206\Fakturownia\Stateful\Diagnostics\FakturowniaDiagnosticProviderExtensions;
@@ -62,6 +91,7 @@ use Cieplik206\Fakturownia\Stateful\Resources\Contracts\InvoiceResourceSnapshotP
 use Cieplik206\Fakturownia\Stateful\Resources\IssueInvoiceResourceProjectionMapper;
 use Cieplik206\IntegrationOperations\Events\OperationTerminalized;
 use Cieplik206\IntegrationOperations\IntegrationOperations;
+use Cieplik206\IntegrationOperations\Persistence\KernelDatabase;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
@@ -82,6 +112,8 @@ final class FakturowniaServiceProvider extends ServiceProvider
                 $app->make(ClientFactory::class),
                 new DeferredOperationQuery($app),
                 $app->make(KsefStateReader::class),
+                $app->make(ArtifactDescriptorReader::class),
+                $app->make(ContentAddressedArtifactStore::class),
             ),
         );
         $this->app->singleton(FakturowniaDiagnosticProviderExtensions::class);
@@ -136,6 +168,44 @@ final class FakturowniaServiceProvider extends ServiceProvider
         $this->app->alias(DatabaseKsefStateProjectionStore::class, KsefStateProjectionStore::class);
         $this->app->alias(DatabaseKsefStateProjectionStore::class, KsefStateReader::class);
         $this->app->singleton(DispatchInvoiceKsefAccepted::class);
+
+        $this->app->singleton(DownloadInvoicePdfPayloadCodec::class);
+        $this->app->singleton(ConfigInvoicePdfConfiguration::class);
+        $this->app->alias(ConfigInvoicePdfConfiguration::class, InvoicePdfConfiguration::class);
+        $this->app->singleton(DownloadInvoicePdfOperationFactory::class);
+        $this->app->singleton(InvoicePdfStager::class);
+        $this->app->singleton(DownloadInvoicePdfOperationHandler::class);
+        $this->app->singleton(DownloadInvoicePdfFailureClassifier::class);
+        $this->app->singleton(AuthoritativeDownloadInvoicePdfFailureClassifier::class);
+        $this->app->singleton(DownloadInvoicePdfRetryPolicy::class);
+        $this->app->singleton(AuthoritativeDownloadInvoicePdfRetryPolicy::class);
+        $this->app->singleton(DownloadInvoicePdfReconciliationStrategy::class);
+        $this->app->singleton(AuthoritativeDownloadInvoicePdfReconciliationStrategy::class);
+        $this->app->singleton(InvoicePdfReadyResultCodec::class);
+        $this->app->singleton(InvoicePdfOutcomeProjectionPlanner::class);
+        $this->app->singleton(InvoicePdfOutcomeProjector::class);
+        $this->app->singleton(FakturowniaInvoicePdfSourceReader::class);
+        $this->app->alias(FakturowniaInvoicePdfSourceReader::class, InvoicePdfSourceReader::class);
+        $this->app->singleton(ArtifactAddressLock::class, static function (Application $app): ArtifactAddressLock {
+            $schema = $app->make('config')->get('fakturownia.artifacts.lock_schema');
+
+            if (! is_string($schema) || preg_match('/^[a-z][a-z0-9_]{0,62}$/D', $schema) !== 1) {
+                throw new \InvalidArgumentException('The artifact lock schema is invalid.');
+            }
+
+            return new CacheArtifactAddressLock(
+                $app->make(KernelDatabase::class)->connection(),
+                $schema.'.fakturownia_artifact_locks',
+            );
+        });
+        $this->app->singleton(FilesystemContentAddressedArtifactStore::class);
+        $this->app->alias(FilesystemContentAddressedArtifactStore::class, ContentAddressedArtifactStore::class);
+        $this->app->singleton(AesGcmArtifactMetadataProtector::class);
+        $this->app->alias(AesGcmArtifactMetadataProtector::class, ArtifactMetadataProtector::class);
+        $this->app->singleton(DatabaseArtifactStore::class);
+        $this->app->alias(DatabaseArtifactStore::class, ArtifactProjectionStore::class);
+        $this->app->alias(DatabaseArtifactStore::class, ArtifactDescriptorReader::class);
+        $this->app->singleton(DispatchInvoicePdfReady::class);
     }
 
     public function boot(IntegrationOperations $operations): void
@@ -145,10 +215,16 @@ final class FakturowniaServiceProvider extends ServiceProvider
         $operations->registerAuthoritativeProvider(AuthoritativeIssueInvoiceOperationDefinitionProvider::class);
         $operations->registerProvider(EnsureAcceptedOperationDefinitionProvider::class);
         $operations->registerAuthoritativeProvider(AuthoritativeEnsureAcceptedOperationDefinitionProvider::class);
+        $operations->registerProvider(DownloadInvoicePdfOperationDefinitionProvider::class);
+        $operations->registerAuthoritativeProvider(AuthoritativeDownloadInvoicePdfOperationDefinitionProvider::class);
 
         $this->app->make(Dispatcher::class)->listen(
             OperationTerminalized::class,
             [DispatchInvoiceKsefAccepted::class, 'handle'],
+        );
+        $this->app->make(Dispatcher::class)->listen(
+            OperationTerminalized::class,
+            [DispatchInvoicePdfReady::class, 'handle'],
         );
 
         $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');

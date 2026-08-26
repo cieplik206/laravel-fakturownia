@@ -31,6 +31,12 @@ return [
         'maintenance_batch_size' => (int) env('FAKTUROWNIA_ARTIFACT_MAINTENANCE_BATCH_SIZE', 100),
         'require_shared_storage_in_production' => (bool) env('FAKTUROWNIA_ARTIFACT_REQUIRE_SHARED_STORAGE', true),
         'max_pdf_bytes' => (int) env('FAKTUROWNIA_ARTIFACT_MAX_PDF_BYTES', 20 * 1024 * 1024),
+        'encryption' => [
+            'active_version' => (int) env('FAKTUROWNIA_ARTIFACT_ENCRYPTION_ACTIVE_VERSION', 1),
+            'keys' => [
+                1 => env('FAKTUROWNIA_ARTIFACT_ENCRYPTION_KEY_V1', ''),
+            ],
+        ],
     ],
 
     'reconciliation' => [

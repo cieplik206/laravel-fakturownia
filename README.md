@@ -205,6 +205,53 @@ fail-closed disabled adapter. Binding an application adapter must include the
 reviewed connection-settings preflight and must call the supplied effect
 boundary immediately before the single remote write.
 
+## Durable invoice PDF artifacts
+
+`fakturownia.invoice.pdf.download` freezes one PDF revision from the persisted
+invoice resource, its row version, optional terminal KSeF identity, and a
+rendering profile. The remote PDF is fully staged, bounded, validated by its
+PDF magic bytes, and SHA-256 addressed before the single artifact-store effect
+boundary opens. Retrying the same revision is idempotent. A lost storage
+response is reconciled by re-reading the remote PDF and inspecting only its
+exact content address; the reconciliation path never performs a second write.
+
+Create the intent through `DownloadInvoicePdfOperationFactory` and submit it to
+the shared `OperationCoordinator`. After terminal projection, the selected
+connection exposes only its own descriptors and verified streams:
+
+```php
+use Cieplik206\Fakturownia\Stateful\Artifacts\ArtifactId;
+use Cieplik206\Fakturownia\Stateful\FakturowniaManager;
+use Cieplik206\IntegrationOperations\ValueObjects\ConnectionKey;
+
+$artifacts = app(FakturowniaManager::class)
+    ->connection(new ConnectionKey('sales'))
+    ->artifacts();
+
+$descriptor = $artifacts->find(new ArtifactId($artifactId));
+$stream = $artifacts->open(new ArtifactId($artifactId));
+```
+
+The reader verifies that the ready descriptor still matches the immutable
+object before opening the stream. A successful terminal projection dispatches
+`InvoicePdfReady` only after that same integrity check. Descriptor storage keys
+and optional government IDs are protected with versioned AES-256-GCM metadata.
+Configure a private/shared Laravel filesystem disk and keep every encryption
+key in secret management:
+
+    FAKTUROWNIA_ARTIFACT_DISK=private-artifacts
+    FAKTUROWNIA_ARTIFACT_PREFIX=fakturownia/finalized
+    FAKTUROWNIA_ARTIFACT_MAX_PDF_BYTES=20971520
+    FAKTUROWNIA_ARTIFACT_RETENTION_DAYS=90
+    FAKTUROWNIA_ARTIFACT_ENCRYPTION_ACTIVE_VERSION=1
+    FAKTUROWNIA_ARTIFACT_ENCRYPTION_KEY_V1=base64:<32-random-bytes>
+
+Retain old key versions while descriptors encrypted with them still exist.
+Changing the rendering profile or persisted source revision produces a new
+artifact revision. Increment the operation generation only after a prior
+attempt has conclusively failed as not applied; it does not change the content
+revision or artifact identifier.
+
 The stateful package also contains local sync-integrity contracts for later
 master-data lanes. `SnapshotAttestor` creates versioned HMACs separated by the
 exact connection and lane; `FullSnapshotAuditor` compares a completed remote

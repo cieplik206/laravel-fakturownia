@@ -8,6 +8,7 @@ use LogicException;
 
 abstract class ArtifactContentStream
 {
+    /** @phpstan-impure */
     abstract public function read(int $maximumBytes): string;
 
     abstract public function eof(): bool;
