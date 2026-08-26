@@ -1,0 +1,60 @@
+{
+    "method": "POST",
+    "path": "/invoices.json",
+    "authentication": {
+        "placement": "json_body_top_level",
+        "field": "api_token"
+    },
+    "headers": {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+    },
+    "query": [],
+    "body": {
+        "invoice": {
+            "kind": "vat",
+            "income": "1",
+            "sell_date": "2026-08-20",
+            "issue_date": "2026-08-26",
+            "buyer_company": true,
+            "department_id": "376237",
+            "buyer_last_name": "",
+            "buyer_name": "Firma Testowa Sp. z o.o.",
+            "buyer_tax_no": "123-456-78-90",
+            "buyer_post_code": "00-001",
+            "buyer_city": "Warszawa",
+            "buyer_street": "Testowa 1",
+            "buyer_country": "PL",
+            "buyer_email": "buyer@example.test",
+            "payment_type": "Przelew",
+            "status": "issued",
+            "paid": "0.00",
+            "description": "Nr zamówienia: ORDER-123",
+            "payment_to_kind": "off",
+            "paid_date": null,
+            "positions": [
+                {
+                    "name": "Produkt testowy [SKU-1]",
+                    "tax": "23",
+                    "total_price_gross": "90.00",
+                    "quantity": "1",
+                    "quantity_unit": "szt."
+                },
+                {
+                    "name": "Transport DPD",
+                    "tax": "23",
+                    "total_price_gross": "10.00",
+                    "quantity": "1",
+                    "quantity_unit": "szt."
+                }
+            ],
+            "payment_to": null,
+            "buyer_tax_no_kind": "",
+            "buyer_first_name": null,
+            "number": "",
+            "currency": "PLN",
+            "use_invoice_issuer": false,
+            "oid": "ORDER-123"
+        }
+    }
+}

@@ -1,0 +1,657 @@
+{
+    "contract": "cieplik206.fakturownia.capability-matrix",
+    "matrix_version": "0.1",
+    "default_policy": {
+        "unknown_capability": "deny",
+        "unknown_classification": "deny",
+        "public_api_gate": "required_live_evidence_must_be_passed",
+        "passed_evidence_requires": ["allowlisted_contract", "canonical_repository_relative_path", "sha256", "semantic_fixture_validation", "trusted_ed25519_attestation", "preautoload_verified_read_only_snapshot", "supervised_launch_manifest_binding", "broker_owned_atomic_authorization_consumption", "external_atomic_consumption_receipt", "signed_brokered_effect_execution_receipts", "archived_harness_snapshot", "globally_unique_claim_cursor_run_id_nonce"],
+        "deferred_capability": "disabled",
+        "vat_pilot_blocking_rule": "only_explicit_blocks_vat_pilot_flags"
+    },
+    "evidence_contracts": {
+        "fakturownia-invoice-identity-s0.3-v1": "invoice_identity_fixture_guard",
+        "fakturownia-ksef-demo-s0.4-v1": "ksef_demo_fixture_guard"
+    },
+    "attestation_policy": {
+        "authorization_contract": "cieplik206.fakturownia.live-probe-authorization",
+        "evidence_payload_contract": "cieplik206.fakturownia.live-evidence-result-payload",
+        "evidence_contract": "cieplik206.fakturownia.live-evidence-attestation",
+        "consumption_claim_request_contract": "cieplik206.fakturownia.authorization-consumption-claim-request",
+        "consumption_receipt_contract": "cieplik206.fakturownia.authorization-consumption-receipt",
+        "consumption_replay_policy": "consume_after_read_preflight_before_mutating_http_no_retry",
+        "fresh_consumption_disposition": "fresh_direct_grant",
+        "recovered_consumption_disposition": "recovered_consumed_proof",
+        "version": "1",
+        "algorithm": "Ed25519",
+        "unsigned_sidecar_suffix": ".attestation.unsigned.json",
+        "signed_sidecar_suffix": ".attestation.json",
+        "preautoload_trust_root": {
+            "launcher_source_path": "bin/fakturownia-live-evidence-launcher.php",
+            "launcher_source_sha256": "e0fe53eb581157b73c9fdf588631e1a2a7486a05305312da45157fd52dbe0951",
+            "policy_contract": "cieplik206.fakturownia.preauthenticated-policy",
+            "manifest_contract": "cieplik206.fakturownia.preauthenticated-snapshot",
+            "version": 1,
+            "production_launcher_path": "/usr/local/libexec/cieplik206/fakturownia-live-evidence-launcher.php",
+            "policy_path": "/etc/cieplik206/fakturownia-live-evidence/preautoload-policy.json",
+            "snapshot_root": "/var/lib/cieplik206/fakturownia-live-evidence/snapshots",
+            "launch_manifest_handoff": "root_authenticated_af_unix_fd6",
+            "native_supervisor_status": "not_implemented_requires_explicit_user_approval",
+            "provider_credentials_in_php": "forbidden",
+            "status": "fail_closed_before_manifest_parse_or_secret_open"
+        },
+        "brokered_effect_execution": {
+            "effect_descriptor_contract": "cieplik206.fakturownia.live-effect-descriptor",
+            "effect_descriptor_version": "1",
+            "effect_descriptor_operations": [
+                {"evidence_contract": "fakturownia-invoice-identity-s0.3-v1", "profiles": ["invoice_identity"], "capability": "invoice.vat.issue", "semantic_effect": "invoice_create", "http_method": "POST", "endpoint_template": "/invoices.json", "request_body_policy": "required_non_empty", "maximum_effect_sequence": 11},
+                {"evidence_contract": "fakturownia-ksef-demo-s0.4-v1", "profiles": ["explicit_block", "explicit_persist", "auto_block", "auto_persist"], "capability": "contract_probe.invoice.fixture.issue", "semantic_effect": "probe_fixture_invoice_create", "http_method": "POST", "endpoint_template": "/invoices.json", "request_body_policy": "required_non_empty", "maximum_effect_sequence": 8},
+                {"evidence_contract": "fakturownia-ksef-demo-s0.4-v1", "profiles": ["explicit_block", "explicit_persist"], "capability": "invoice.ksef.ensure_accepted", "semantic_effect": "ksef_explicit_submit", "http_method": "GET", "endpoint_template": "/invoices/{invoice_id}.json?send_to_ksef=yes", "request_body_policy": "must_be_empty", "maximum_effect_sequence": 8}
+            ],
+            "supervisor_attestation": "required_not_implemented",
+            "authorization_cas": "root_broker_owned",
+            "provider_http": "root_broker_owned_one_shot",
+            "php_direct_provider_write": "forbidden",
+            "signed_execution_receipt": "required_for_canonical_live_evidence",
+            "status": "unprovisioned_fail_closed"
+        },
+        "trusted_signer_store": {
+            "path": "tests/Fixtures/Contract/trusted-operator-signers.json",
+            "contract": "cieplik206.fakturownia.trusted-operator-signers",
+            "version": "1",
+            "sha256": "228fa29cf6151c990c4e47cd639a9358d44cef06a8e70e4e1c07ff224d0254b7"
+        },
+        "remote_authority_policy_store": {
+            "path": "tests/Fixtures/Contract/trusted-consumption-authorities.json",
+            "contract": "cieplik206.fakturownia.remote-consumption-authorities",
+            "version": "1",
+            "sha256": "80d35511063aa2d59731e91d2e1ac96be26d04ae416b0408b864295d0a2ce6ec",
+            "status": "unprovisioned_fail_closed"
+        },
+        "maximum_authorization_ttl_seconds": 86400,
+        "maximum_evidence_ttl_seconds": 2592000,
+        "maximum_signing_delay_seconds": 86400,
+        "max_run_seconds": 21600,
+        "future_skew_seconds": 300
+    },
+    "spi_constraints": {
+        "provider_spi": "0.1",
+        "provider_auto_send_ensure_accepted": {
+            "spi_0_1": "forbidden",
+            "required_spi": "0.2",
+            "required_contract": "SuccessEffectPolicy",
+            "required_values": ["must_be_applied_by_operation", "may_be_observed_externally", "read_only"]
+        }
+    },
+    "capabilities": [
+        {
+            "id": "invoice.vat.issue",
+            "milestone": "0.1",
+            "classification": "exact",
+            "transport": {"method": "POST", "endpoint": "/invoices.json"},
+            "semantic_writes": {"count": 1, "effects": ["invoice_create"]},
+            "identity": {
+                "scope": ["provider", "connection", "account", "department", "document_kind", "business_oid"],
+                "fingerprint": ["buyer_tax_identity", "currency", "total", "issue_date", "positions"]
+            },
+            "recovery": {
+                "safe_retry": "request_not_started_before_effect_boundary_only",
+                "reconciliation": "exact_business_oid_with_stable_payload_fingerprint; absent_conclusive_terminates_failed_not_applied"
+            },
+            "policy": {"ownership": "sdk_explicit", "validation": "typed_request_and_response", "profile": "business_oid+oid_unique_after_s0.3"},
+            "live_evidence": {
+                "required": true,
+                "status": "pending_implementation",
+                "requirements": ["native_root_supervisor_and_secret_broker", "independently_verified_launch_manifest", "broker_owned_authorization_cas", "signed_effect_execution_receipts", "demo_pl_complete_and_safe", "demo_regional_complete_and_safe", "lost_response_exact_match", "cross_scope_isolation"],
+                "artifacts": []
+            },
+            "limitations": ["The native supervisor and one-shot effect broker are not implemented", "S0.3 has no committed live fixtures", "no blind write retry", "OID remains a business identifier"],
+            "blocks_vat_pilot": true
+        },
+        {
+            "id": "invoice.ksef.ensure_accepted",
+            "milestone": "0.2",
+            "classification": "state-verifiable",
+            "transport": {"method": "GET", "endpoint": "/invoices/{id}.json?send_to_ksef=yes"},
+            "semantic_writes": {"count": 1, "effects": ["ksef_explicit_submit"]},
+            "identity": {
+                "scope": ["provider", "connection", "remote_invoice_id"],
+                "fingerprint": ["remote_invoice_id", "ownership_profile", "validation_profile", "gov_status", "gov_id"]
+            },
+            "recovery": {
+                "safe_retry": "poll_only_after_effect_boundary",
+                "reconciliation": "preflight_then_one_explicit_send_then_status_observation_until_terminal_or_manual_review"
+            },
+            "policy": {"ownership": "explicit_sdk", "validation": "block_invalid", "profile": "explicit_sdk+block_invalid"},
+            "live_evidence": {
+                "required": true,
+                "status": "pending_implementation",
+                "requirements": ["native_root_supervisor_and_secret_broker", "independently_verified_launch_manifest", "broker_owned_authorization_cas", "signed_effect_execution_receipts", "dedicated_capability_run_id_nonce_cursor", "operator_attested_settings_hmac", "exact_connection_fingerprint", "bounded_settings_evidence_ttl", "operator_attestation_internal_utc_and_fixed_600_second_ttl", "settings_evidence_serialization_forbidden", "initial_explicit_sdk_doctor_preflight", "sealed_online_settings_reader", "four_profile_demo_matrix", "exactly_one_explicit_send", "provider_auto_send_observe_only", "terminal_gov_id", "succeeded_status_requires_bounded_gov_id", "demo_error_statuses_cannot_satisfy_success"],
+                "artifacts": []
+            },
+            "limitations": [
+                "The native supervisor and one-shot effect broker are not implemented",
+                "S0.4 has no committed live fixture",
+                "S5.1 operator-attested settings evidence is local preflight evidence only and never authorizes an explicit send",
+                "S5.1 doctor permitsExplicitSend remains false even when local settings preflight passes",
+                "The sealed online settings reader required for explicit-send promotion is not implemented",
+                "KSeF ensure evidence cannot share a run, authorization, claim cursor, nonce or attestation with PDF observation evidence",
+                "ProviderAutoSend ensureAccepted is forbidden by Provider SPI 0.1",
+                "RT5 requires versioned SuccessEffectPolicy 0.2 before ProviderAutoSend registration",
+                "gov_save_and_send is not a managed pilot path"
+            ],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "invoice.pdf.ksef_revision.observe",
+            "milestone": "0.2",
+            "classification": "state-verifiable",
+            "transport": {"method": "GET", "endpoint": "/invoices/{id}.pdf"},
+            "semantic_writes": {"count": 0, "effects": []},
+            "identity": {
+                "scope": ["provider", "connection", "remote_invoice_id", "ksef_probe_run"],
+                "fingerprint": ["mime", "size", "ephemeral_run_hmac_sha256", "before_after_equality"]
+            },
+            "recovery": {"safe_retry": "read_safe_with_redirects_forbidden", "reconciliation": "validate_http_mime_magic_bytes_size_and_checksum"},
+            "policy": {"ownership": "contract_probe", "validation": "binary_pdf_contract_redirects_forbidden", "profile": "s0.4_pre_post_observation"},
+            "live_evidence": {
+                "required": true,
+                "status": "pending_implementation",
+                "requirements": ["native_root_supervisor_and_secret_broker", "independently_verified_launch_manifest", "brokered_probe_setup_execution_receipts", "dedicated_capability_run_id_nonce_cursor", "valid_pdf_before_ksef", "valid_pdf_after_ksef", "revision_equality_recorded"],
+                "artifacts": []
+            },
+            "limitations": ["The native supervisor and one-shot effect broker are not implemented", "S0.4 has no committed live fixture", "PDF observation evidence cannot share a run, authorization, claim cursor, nonce or attestation with KSeF ensure evidence", "equal and changed pre/post KSeF hashes are both valid evidence", "redirects are forbidden by this evidence profile", "this observation does not prove durable ArtifactStore behavior"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "invoice.pdf.download",
+            "milestone": "RT-6/S6.1-2",
+            "classification": "state-verifiable",
+            "transport": {"method": "GET", "endpoint": "/invoices/{id}.pdf + ArtifactStore.putIfAbsent"},
+            "semantic_writes": {"count": 1, "effects": ["artifact_store_put"]},
+            "identity": {
+                "scope": ["provider", "connection", "remote_invoice_id", "remote_snapshot_version", "ksef_terminal_operation", "rendering_profile"],
+                "fingerprint": ["artifact_revision", "mime", "size", "sha256"]
+            },
+            "recovery": {
+                "safe_retry": "content_addressed_put_after_rt6_gate",
+                "reconciliation": "object_head_size_and_sha256_then_descriptor_or_orphan_recovery"
+            },
+            "policy": {"ownership": "sdk_artifact_store", "validation": "remote_pdf_and_content_addressed_object_contract", "profile": "immutable_content_addressed_revision"},
+            "live_evidence": {
+                "required": true,
+                "status": "pending_implementation",
+                "requirements": ["versioned_rt6_artifact_evidence_contract_and_guard", "artifact_store_contract", "content_addressed_put_confirmation", "atomic_descriptor_projection", "orphan_recovery", "checksum_doctor", "shared_database_artifact_lock", "lease_owner_revalidation", "lease_renewal_before_critical_sections", "sealed_purge_authority_permit", "artifact_value_object_native_unserialize_denied", "terminal_tombstone", "immutable_purge_deadline", "ready_to_deleted_transition_forbidden", "truncate_bypass_forbidden", "retention_policy_mismatch_blocks_delete", "doctor_complete_pagination_before_pass", "database_lock_schema_and_search_path_binding", "database_lock_same_repository_writer_connection", "ciphertext_sha256_integrity", "retention_and_crash_chaos"],
+                "artifacts": []
+            },
+            "limitations": ["S0.4 proves only the remote PDF observation", "S6 content-addressed store and maintenance code exists, but production remote-PDF integration, crash and retention evidence, and a reviewed capability digest are not published", "raw RT-3 streaming has an independent redirect gate"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "invoice.correction.issue",
+            "milestone": "0.3",
+            "classification": "exact",
+            "transport": {"method": "POST", "endpoint": "/invoices.json"},
+            "semantic_writes": {"count": 1, "effects": ["correction_invoice_create"]},
+            "identity": {
+                "scope": ["provider", "connection", "original_remote_invoice_id", "correction_semantic_slot", "business_oid"],
+                "fingerprint": ["original_remote_invoice_id", "buyer_tax_identity", "currency", "total", "issue_date", "positions_before_after"]
+            },
+            "recovery": {
+                "safe_retry": "request_not_started_before_effect_boundary_only",
+                "reconciliation": "exact_original_invoice_link_business_oid_and_correction_fingerprint"
+            },
+            "policy": {"ownership": "sdk_explicit", "validation": "correction_dto_and_remote_state_preflight", "profile": "not_published_until_rt7_gate"},
+            "live_evidence": {
+                "required": true,
+                "status": "pending_implementation",
+                "requirements": ["native_root_supervisor_and_secret_broker", "independently_verified_launch_manifest", "broker_owned_authorization_cas", "signed_effect_execution_receipts", "dedicated_correction_evidence_contract", "typed_correction_payload_and_response", "exact_original_invoice_link", "negative_values", "before_after_attributes", "timeout_exact_match", "no_second_correction"],
+                "artifacts": []
+            },
+            "limitations": ["S7.1 typed correction DTO and mapping code exists, but no production execution capability, live fixture or brokered effect receipt is published", "KSeF and PDF remain separate operations"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "invoice.read.list",
+            "milestone": "RT-3/S3.3",
+            "classification": "state-verifiable",
+            "transport": {"method": "GET", "endpoint": "/invoices.json"},
+            "semantic_writes": {"count": 0, "effects": []},
+            "identity": {"scope": ["provider", "connection", "remote_invoice_id"], "fingerprint": ["typed_remote_snapshot"]},
+            "recovery": {"safe_retry": "read_safe_after_contract_gate", "reconciliation": "pagination_stable_order_duplicate_page_guard_and_complete_exact_oid_scan"},
+            "policy": {"ownership": "sdk_read_client", "validation": "typed_invoice_collection_contract", "profile": "rt3_pending"},
+            "live_evidence": {"required": true, "status": "pending_implementation", "requirements": ["versioned_rt3_read_evidence_contract_and_guard", "invoice_list_contract_fixture", "open_enums", "unknown_fields_tolerated", "exact_oid_query_tuple", "complete_exact_oid_pagination", "strict_decimal_scalar_provenance"], "artifacts": []},
+            "limitations": ["RT-3 typed read implementation exists, but the production capability gate remains closed until the exact response/error contract fixture and reviewed evidence digest are pinned", "The exact OID query path cannot authorize oid_unique until a dedicated reviewed live artifact is pinned"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "invoice.read.get",
+            "milestone": "RT-3/S3.3",
+            "classification": "state-verifiable",
+            "transport": {"method": "GET", "endpoint": "/invoices/{id}.json"},
+            "semantic_writes": {"count": 0, "effects": []},
+            "identity": {"scope": ["provider", "connection", "remote_invoice_id"], "fingerprint": ["typed_remote_snapshot"]},
+            "recovery": {"safe_retry": "read_safe_after_contract_gate", "reconciliation": "exact_remote_invoice_id"},
+            "policy": {"ownership": "sdk_read_client", "validation": "typed_invoice_contract", "profile": "rt3_pending"},
+            "live_evidence": {"required": true, "status": "pending_implementation", "requirements": ["versioned_rt3_read_evidence_contract_and_guard", "invoice_get_contract_fixture", "open_enums", "http_200_error_detection"], "artifacts": []},
+            "limitations": ["RT-3 typed read implementation exists, but the production capability gate remains closed until the exact response/error contract fixture and reviewed evidence digest are pinned"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "client.read.list",
+            "milestone": "RT-3/S3.4",
+            "classification": "state-verifiable",
+            "transport": {"method": "GET", "endpoint": "/clients.json"},
+            "semantic_writes": {"count": 0, "effects": []},
+            "identity": {"scope": ["provider", "connection", "remote_client_id"], "fingerprint": ["typed_remote_snapshot"]},
+            "recovery": {"safe_retry": "read_safe_after_contract_gate", "reconciliation": "pagination_stable_order_and_remote_id_deduplication"},
+            "policy": {"ownership": "sdk_read_client", "validation": "typed_client_collection_contract", "profile": "rt3_pending"},
+            "live_evidence": {"required": true, "status": "pending_implementation", "requirements": ["versioned_rt3_read_evidence_contract_and_guard", "client_list_contract_fixture", "pagination", "unknown_fields_tolerated"], "artifacts": []},
+            "limitations": ["RT-3 typed read implementation exists, but the production capability gate remains closed until the exact response/error contract fixture and reviewed evidence digest are pinned"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "client.read.get",
+            "milestone": "RT-3/S3.4",
+            "classification": "state-verifiable",
+            "transport": {"method": "GET", "endpoint": "/clients/{id}.json"},
+            "semantic_writes": {"count": 0, "effects": []},
+            "identity": {"scope": ["provider", "connection", "remote_client_id"], "fingerprint": ["typed_remote_snapshot"]},
+            "recovery": {"safe_retry": "read_safe_after_contract_gate", "reconciliation": "exact_remote_client_id"},
+            "policy": {"ownership": "sdk_read_client", "validation": "typed_client_contract", "profile": "rt3_pending"},
+            "live_evidence": {"required": true, "status": "pending_implementation", "requirements": ["versioned_rt3_read_evidence_contract_and_guard", "client_get_contract_fixture", "http_200_error_detection"], "artifacts": []},
+            "limitations": ["RT-3 typed read implementation exists, but the production capability gate remains closed until the exact response/error contract fixture and reviewed evidence digest are pinned"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "product.read.list",
+            "milestone": "RT-3/S3.4",
+            "classification": "state-verifiable",
+            "transport": {"method": "GET", "endpoint": "/products.json"},
+            "semantic_writes": {"count": 0, "effects": []},
+            "identity": {"scope": ["provider", "connection", "remote_product_id"], "fingerprint": ["typed_remote_snapshot"]},
+            "recovery": {"safe_retry": "read_safe_after_contract_gate", "reconciliation": "pagination_stable_order_and_remote_id_deduplication"},
+            "policy": {"ownership": "sdk_read_client", "validation": "typed_product_collection_contract", "profile": "rt3_pending"},
+            "live_evidence": {"required": true, "status": "pending_implementation", "requirements": ["versioned_rt3_read_evidence_contract_and_guard", "product_list_contract_fixture", "pagination", "unknown_fields_tolerated"], "artifacts": []},
+            "limitations": ["RT-3 typed read implementation exists, but the production capability gate remains closed until the exact response/error contract fixture and reviewed evidence digest are pinned"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "product.read.get",
+            "milestone": "RT-3/S3.4",
+            "classification": "state-verifiable",
+            "transport": {"method": "GET", "endpoint": "/products/{id}.json"},
+            "semantic_writes": {"count": 0, "effects": []},
+            "identity": {"scope": ["provider", "connection", "remote_product_id"], "fingerprint": ["typed_remote_snapshot"]},
+            "recovery": {"safe_retry": "read_safe_after_contract_gate", "reconciliation": "exact_remote_product_id"},
+            "policy": {"ownership": "sdk_read_client", "validation": "typed_product_contract", "profile": "rt3_pending"},
+            "live_evidence": {"required": true, "status": "pending_implementation", "requirements": ["versioned_rt3_read_evidence_contract_and_guard", "product_get_contract_fixture", "http_200_error_detection"], "artifacts": []},
+            "limitations": ["RT-3 typed read implementation exists, but the production capability gate remains closed until the exact response/error contract fixture and reviewed evidence digest are pinned"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "invoice.pdf.stream",
+            "milestone": "RT-3/S3.6",
+            "classification": "state-verifiable",
+            "transport": {"method": "GET", "endpoint": "/invoices/{id}.pdf"},
+            "semantic_writes": {"count": 0, "effects": []},
+            "identity": {"scope": ["provider", "connection", "remote_invoice_id"], "fingerprint": ["mime", "size", "sha256"]},
+            "recovery": {"safe_retry": "read_safe_after_redirect_gate", "reconciliation": "pdf_mime_magic_bytes_size_and_checksum"},
+            "policy": {"ownership": "sdk_read_client", "validation": "bounded_binary_stream_contract", "profile": "rt3_pending"},
+            "live_evidence": {"required": true, "status": "pending_implementation", "requirements": ["versioned_rt3_read_evidence_contract_and_guard", "pdf_stream_contract_fixture", "redirect_host_policy", "corrupt_file_rejection"], "artifacts": []},
+            "limitations": ["The bounded RT-3 stream implementation exists, but the production capability gate remains closed until the binary contract fixture and reviewed evidence digest are pinned", "Raw stream is distinct from the durable invoice.pdf.download operation"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "invoice.attachments.zip.stream",
+            "milestone": "RT-3/S3.6",
+            "classification": "state-verifiable",
+            "transport": {"method": "GET", "endpoint": "/invoices/{id}/attachments_zip.json"},
+            "semantic_writes": {"count": 0, "effects": []},
+            "identity": {"scope": ["provider", "connection", "remote_invoice_id"], "fingerprint": ["mime", "size", "sha256"]},
+            "recovery": {"safe_retry": "read_safe_after_redirect_gate", "reconciliation": "zip_mime_magic_bytes_size_and_checksum"},
+            "policy": {"ownership": "sdk_read_client", "validation": "bounded_binary_stream_contract", "profile": "rt3_pending"},
+            "live_evidence": {"required": true, "status": "pending_implementation", "requirements": ["versioned_rt3_read_evidence_contract_and_guard", "zip_stream_contract_fixture", "redirect_host_policy", "corrupt_file_rejection"], "artifacts": []},
+            "limitations": ["The bounded RT-3 stream implementation exists, but the production capability gate remains closed until the binary contract fixture and reviewed evidence digest are pinned"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "invoice.ksef.xml.stream",
+            "milestone": "RT-3/S3.6",
+            "classification": "state-verifiable",
+            "transport": {"method": "GET", "endpoint": "/invoices/{id}/attachment?kind=gov"},
+            "semantic_writes": {"count": 0, "effects": []},
+            "identity": {"scope": ["provider", "connection", "remote_invoice_id", "gov_id"], "fingerprint": ["mime", "size", "sha256"]},
+            "recovery": {"safe_retry": "read_safe_after_redirect_gate", "reconciliation": "http_302_ready_or_404_missing_then_xml_mime_content_size_and_checksum"},
+            "policy": {"ownership": "sdk_read_client", "validation": "bounded_xml_stream_contract_with_302_ready_404_missing", "profile": "rt3_pending"},
+            "live_evidence": {"required": true, "status": "pending_implementation", "requirements": ["versioned_rt3_read_evidence_contract_and_guard", "xml_stream_contract_fixture", "http_302_ready_redirect", "http_404_missing", "redirect_host_policy", "corrupt_file_rejection"], "artifacts": []},
+            "limitations": ["The bounded RT-3 stream implementation exists, but the production capability gate remains closed until the binary contract fixture and reviewed evidence digest are pinned", "Raw stream does not terminalize ensureAccepted and is not a durable artifact"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "invoice.ksef.upo.stream",
+            "milestone": "RT-3/S3.6",
+            "classification": "state-verifiable",
+            "transport": {"method": "GET", "endpoint": "/invoices/{id}/attachment?kind=gov_upo"},
+            "semantic_writes": {"count": 0, "effects": []},
+            "identity": {"scope": ["provider", "connection", "remote_invoice_id", "gov_id"], "fingerprint": ["mime", "size", "sha256"]},
+            "recovery": {"safe_retry": "read_safe_after_redirect_gate", "reconciliation": "http_302_ready_or_404_missing_then_upo_mime_content_size_and_checksum"},
+            "policy": {"ownership": "sdk_read_client", "validation": "bounded_upo_stream_contract_with_302_ready_404_missing", "profile": "rt3_pending"},
+            "live_evidence": {"required": true, "status": "pending_implementation", "requirements": ["versioned_rt3_read_evidence_contract_and_guard", "upo_stream_contract_fixture", "http_302_ready_redirect", "http_404_missing", "redirect_host_policy", "corrupt_file_rejection"], "artifacts": []},
+            "limitations": ["The bounded RT-3 stream implementation exists, but the production capability gate remains closed until the binary contract fixture and reviewed evidence digest are pinned", "Raw stream does not terminalize ensureAccepted and is not a durable artifact", "A separate PDF UPO endpoint is unconfirmed and remains unpublished"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "invoice.proforma.issue",
+            "milestone": "later-minor",
+            "classification": "deferred",
+            "transport": {"method": "POST", "endpoint": "/invoices.json"},
+            "semantic_writes": {"count": 1, "effects": ["proforma_create"]},
+            "identity": {"scope": ["provider", "connection", "proforma_semantic_slot"], "fingerprint": ["not_frozen"]},
+            "recovery": {"safe_retry": "disabled_until_capability_gate", "reconciliation": "not_frozen"},
+            "policy": {"ownership": "not_assigned", "validation": "not_frozen", "profile": "deferred_rt8"},
+            "live_evidence": {"required": true, "status": "deferred", "requirements": ["proforma_identity_scope", "single_effect_timeout_reconciliation"], "artifacts": []},
+            "limitations": ["VAT identity evidence cannot be reused without a proforma-specific gate"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "cost.invoice.read",
+            "milestone": "later-minor",
+            "classification": "deferred",
+            "transport": {"method": "GET", "endpoint": "/invoices.json?income=no"},
+            "semantic_writes": {"count": 0, "effects": []},
+            "identity": {"scope": ["provider", "connection", "remote_invoice_id"], "fingerprint": ["remote_snapshot_hmac"]},
+            "recovery": {"safe_retry": "read_safe_after_contract_gate", "reconciliation": "overlap_window_remote_id_deduplication"},
+            "policy": {"ownership": "sdk_read_projection", "validation": "not_frozen", "profile": "deferred_rt8"},
+            "live_evidence": {"required": true, "status": "deferred", "requirements": ["pagination", "duplicate_policy", "Optima_mapping_shadow_comparison"], "artifacts": []},
+            "limitations": ["Existing PMS import remains owner until cutover"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "cost.invoice.create",
+            "milestone": "later-minor",
+            "classification": "deferred",
+            "transport": {"method": "POST", "endpoint": "/invoices.json"},
+            "semantic_writes": {"count": 1, "effects": ["cost_invoice_create"]},
+            "identity": {"scope": ["provider", "connection", "cost_semantic_slot"], "fingerprint": ["not_frozen"]},
+            "recovery": {"safe_retry": "disabled_until_capability_gate", "reconciliation": "not_frozen"},
+            "policy": {"ownership": "not_assigned", "validation": "not_frozen", "profile": "deferred_rt8"},
+            "live_evidence": {"required": true, "status": "deferred", "requirements": ["timeout_reconciliation", "duplicate_response", "open_status_enum"], "artifacts": []},
+            "limitations": ["Cost duplicate policy remains in PMS"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "cost.invoice.status.change",
+            "milestone": "later-minor",
+            "classification": "deferred",
+            "transport": {"method": "POST", "endpoint": "/invoices/{id}/change_status.json"},
+            "semantic_writes": {"count": 1, "effects": ["cost_invoice_status_change"]},
+            "identity": {"scope": ["provider", "connection", "remote_invoice_id"], "fingerprint": ["expected_status", "remote_snapshot_version"]},
+            "recovery": {"safe_retry": "disabled_until_state_preflight_gate", "reconciliation": "expected_remote_status_comparison"},
+            "policy": {"ownership": "not_assigned", "validation": "open_status_enum", "profile": "deferred_rt8"},
+            "live_evidence": {"required": true, "status": "deferred", "requirements": ["preflight_state", "post_write_state_confirmation"], "artifacts": []},
+            "limitations": ["No stable managed request is published"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "cost.invoice.delete",
+            "milestone": "later-minor",
+            "classification": "manual-only",
+            "transport": {"method": "DELETE", "endpoint": "/invoices/{id}.json"},
+            "semantic_writes": {"count": 1, "effects": ["cost_invoice_delete"]},
+            "identity": {"scope": ["provider", "connection", "remote_invoice_id"], "fingerprint": ["remote_snapshot_version", "deletion_eligibility"]},
+            "recovery": {"safe_retry": "never_automatic", "reconciliation": "manual_review_with_post_delete_read_evidence"},
+            "policy": {"ownership": "audited_operator", "validation": "destructive_preflight", "profile": "manual_only_after_rt8_gate"},
+            "live_evidence": {"required": true, "status": "deferred", "requirements": ["destructive_preflight", "no_automatic_retry", "audited_operator_decision"], "artifacts": []},
+            "limitations": ["Destructive capability is disabled until a dedicated owner fence and live gate"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "invoice.attachment.credentials.get",
+            "milestone": "later-minor",
+            "classification": "deferred",
+            "transport": {"method": "GET", "endpoint": "/invoices/{id}/get_new_attachment_credentials.json"},
+            "semantic_writes": {"count": 0, "effects": []},
+            "identity": {"scope": ["provider", "connection", "remote_invoice_id", "file_revision"], "fingerprint": ["ephemeral_multipart_target_contract"]},
+            "recovery": {"safe_retry": "disabled_until_capability_gate", "reconciliation": "not_frozen"},
+            "policy": {"ownership": "sdk_attachment_workflow", "validation": "credential_response_contract_unverified", "profile": "deferred_rt8"},
+            "live_evidence": {"required": true, "status": "deferred", "requirements": ["credential_response_contract", "dynamic_multipart_target_contract", "credential_redaction"], "artifacts": []},
+            "limitations": ["Credentials, multipart upload and finalize are three separate steps", "Ephemeral credentials and upload targets must never be persisted in evidence"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "invoice.attachment.binary.upload",
+            "milestone": "later-minor",
+            "classification": "deferred",
+            "transport": {"method": "POST", "endpoint": "provider_issued_temporary_multipart_upload_target"},
+            "semantic_writes": {"count": 1, "effects": ["attachment_binary_upload"]},
+            "identity": {"scope": ["provider", "connection", "remote_invoice_id", "file_revision"], "fingerprint": ["file_sha256", "size", "media_type"]},
+            "recovery": {"safe_retry": "disabled_until_upload_reconciliation_gate", "reconciliation": "not_frozen"},
+            "policy": {"ownership": "sdk_attachment_workflow", "validation": "binary_limits_and_host_allowlist", "profile": "deferred_rt8"},
+            "live_evidence": {"required": true, "status": "deferred", "requirements": ["credential_preflight", "cross_host_auth_stripping", "upload_crash_recovery"], "artifacts": []},
+            "limitations": ["Upload and finalize require separate operation IDs"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "invoice.attachment.finalize",
+            "milestone": "later-minor",
+            "classification": "deferred",
+            "transport": {"method": "POST", "endpoint": "/invoices/{id}/add_attachment.json"},
+            "semantic_writes": {"count": 1, "effects": ["attachment_finalize"]},
+            "identity": {"scope": ["provider", "connection", "remote_invoice_id", "uploaded_file_revision"], "fingerprint": ["file_name", "file_sha256"]},
+            "recovery": {"safe_retry": "disabled_until_finalize_reconciliation_gate", "reconciliation": "invoice_or_zip_attachment_presence"},
+            "policy": {"ownership": "sdk_attachment_workflow", "validation": "uploaded_source_must_be_durable", "profile": "deferred_rt8"},
+            "live_evidence": {"required": true, "status": "deferred", "requirements": ["independent_receipt", "finalize_crash_recovery", "attachment_presence_read"], "artifacts": []},
+            "limitations": ["Finalize never shares the upload effect boundary"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "payment.read.list",
+            "milestone": "RT-3/S3.4",
+            "classification": "state-verifiable",
+            "transport": {"method": "GET", "endpoint": "/banking/payments.json"},
+            "semantic_writes": {"count": 0, "effects": []},
+            "identity": {"scope": ["provider", "connection", "remote_payment_id"], "fingerprint": ["remote_snapshot_hmac"]},
+            "recovery": {"safe_retry": "read_safe_after_contract_gate", "reconciliation": "pagination_and_remote_id_deduplication"},
+            "policy": {"ownership": "sdk_read_client", "validation": "typed_payment_collection_contract", "profile": "rt3_pending"},
+            "live_evidence": {"required": true, "status": "pending_implementation", "requirements": ["versioned_rt3_read_evidence_contract_and_guard", "payment_list_contract_fixture", "pagination", "unknown_fields_tolerated"], "artifacts": []},
+            "limitations": ["The typed RT-3 payment-list implementation exists, but the production capability gate remains closed until the exact response/error contract fixture and reviewed evidence digest are pinned", "Durable payment sync remains a separate later-minor capability"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "payment.read.get",
+            "milestone": "RT-3/S3.4",
+            "classification": "state-verifiable",
+            "transport": {"method": "GET", "endpoint": "/banking/payment/{id}.json"},
+            "semantic_writes": {"count": 0, "effects": []},
+            "identity": {"scope": ["provider", "connection", "remote_payment_id"], "fingerprint": ["typed_remote_snapshot"]},
+            "recovery": {"safe_retry": "read_safe_after_contract_gate", "reconciliation": "exact_remote_payment_id_after_response_contract_gate"},
+            "policy": {"ownership": "sdk_read_client", "validation": "payment_detail_response_contract_unverified", "profile": "rt3_pending"},
+            "live_evidence": {"required": true, "status": "pending_implementation", "requirements": ["versioned_rt3_read_evidence_contract_and_guard", "payment_get_response_contract", "payment_get_contract_fixture"], "artifacts": []},
+            "limitations": ["The exact singular route and typed request descriptor exist, but the public resource intentionally denies dispatch until the response/error contracts, contract fixture, and reviewed evidence digest are pinned"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "payment.sync",
+            "milestone": "later-minor",
+            "classification": "deferred",
+            "transport": {"method": "GET", "endpoint": "/banking/payments.json"},
+            "semantic_writes": {"count": 0, "effects": []},
+            "identity": {"scope": ["provider", "connection", "remote_payment_id", "checkpoint"], "fingerprint": ["remote_snapshot_hmac"]},
+            "recovery": {"safe_retry": "disabled_until_sync_capability_gate", "reconciliation": "checkpoint_overlap_and_remote_id_deduplication"},
+            "policy": {"ownership": "sdk_checkpoint", "validation": "not_frozen", "profile": "deferred_rt8"},
+            "live_evidence": {"required": true, "status": "deferred", "requirements": ["checkpoint_lease", "overlap_window", "idempotent_replay", "PMS_matching_owner"], "artifacts": []},
+            "limitations": ["RT-3 payment list does not enable durable sync or PMS bank matching"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "payment.create",
+            "milestone": "later-minor",
+            "classification": "deferred",
+            "transport": {"method": "POST", "endpoint": "/banking/payments.json"},
+            "semantic_writes": {"count": 1, "effects": ["payment_create"]},
+            "identity": {"scope": ["provider", "connection", "payment_semantic_slot"], "fingerprint": ["not_frozen"]},
+            "recovery": {"safe_retry": "disabled_until_capability_gate", "reconciliation": "not_frozen"},
+            "policy": {"ownership": "not_assigned", "validation": "not_frozen", "profile": "deferred_rt8"},
+            "live_evidence": {"required": true, "status": "deferred", "requirements": ["create_response_contract", "timeout_reconciliation"], "artifacts": []},
+            "limitations": ["Bank matching decisions remain in PMS"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "payment.update",
+            "milestone": "later-minor",
+            "classification": "deferred",
+            "transport": {"method": "PATCH", "endpoint": "/banking/payments/{id}.json"},
+            "semantic_writes": {"count": 1, "effects": ["payment_update"]},
+            "identity": {"scope": ["provider", "connection", "remote_payment_id"], "fingerprint": ["expected_fields", "remote_snapshot_version"]},
+            "recovery": {"safe_retry": "disabled_until_state_preflight_gate", "reconciliation": "expected_remote_state_comparison"},
+            "policy": {"ownership": "not_assigned", "validation": "not_frozen", "profile": "deferred_rt8"},
+            "live_evidence": {"required": true, "status": "deferred", "requirements": ["preflight_state", "post_write_state_confirmation"], "artifacts": []},
+            "limitations": ["No stable managed request is published"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "payment.delete",
+            "milestone": "later-minor",
+            "classification": "deferred",
+            "transport": {"method": "DELETE", "endpoint": "/banking/payments/{id}.json"},
+            "semantic_writes": {"count": 1, "effects": ["payment_delete"]},
+            "identity": {"scope": ["provider", "connection", "remote_payment_id"], "fingerprint": ["remote_snapshot_version", "deletion_eligibility"]},
+            "recovery": {"safe_retry": "never_automatic", "reconciliation": "manual_review_after_ambiguous_delete"},
+            "policy": {"ownership": "audited_operator", "validation": "destructive_preflight", "profile": "deferred_rt8"},
+            "live_evidence": {"required": true, "status": "deferred", "requirements": ["delete_endpoint_contract", "no_automatic_retry", "manual_review"], "artifacts": []},
+            "limitations": ["Payment mutations remain outside every pilot gate"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "invoice.ksef.xml.download",
+            "milestone": "later-minor",
+            "classification": "deferred",
+            "transport": {"method": "GET", "endpoint": "/invoices/{id}/attachment?kind=gov"},
+            "semantic_writes": {"count": 0, "effects": []},
+            "identity": {"scope": ["provider", "connection", "remote_invoice_id", "gov_id"], "fingerprint": ["mime", "size", "sha256"]},
+            "recovery": {"safe_retry": "read_safe_after_redirect_gate", "reconciliation": "http_302_ready_or_404_missing_then_binary_xml_contract_and_checksum"},
+            "policy": {"ownership": "sdk_artifact_store", "validation": "xml_binary_contract_with_302_ready_404_missing", "profile": "deferred_rt8"},
+            "live_evidence": {"required": true, "status": "deferred", "requirements": ["http_302_ready_redirect", "http_404_missing", "redirect_policy", "xml_mime_and_content", "checksum"], "artifacts": []},
+            "limitations": ["XML is not a hidden condition of ensureAccepted"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "invoice.ksef.upo.download",
+            "milestone": "later-minor",
+            "classification": "deferred",
+            "transport": {"method": "GET", "endpoint": "/invoices/{id}/attachment?kind=gov_upo"},
+            "semantic_writes": {"count": 0, "effects": []},
+            "identity": {"scope": ["provider", "connection", "remote_invoice_id", "gov_id"], "fingerprint": ["mime", "size", "sha256"]},
+            "recovery": {"safe_retry": "read_safe_after_redirect_gate", "reconciliation": "http_302_ready_or_404_missing_then_binary_upo_contract_and_checksum"},
+            "policy": {"ownership": "sdk_artifact_store", "validation": "upo_binary_contract_with_302_ready_404_missing", "profile": "deferred_rt8"},
+            "live_evidence": {"required": true, "status": "deferred", "requirements": ["http_302_ready_redirect", "http_404_missing", "redirect_policy", "upo_mime_and_content", "checksum"], "artifacts": []},
+            "limitations": ["UPO is not a hidden condition of ensureAccepted", "A separate PDF UPO endpoint is unconfirmed and remains unpublished"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "webhook.invoice.receive",
+            "milestone": "later-minor",
+            "classification": "deferred",
+            "transport": {"method": "POST", "endpoint": "application_configured_webhook_inbox"},
+            "semantic_writes": {"count": 0, "effects": []},
+            "identity": {"scope": ["provider", "connection", "delivery_id_or_bounded_payload_hmac"], "fingerprint": ["encrypted_payload_checksum", "remote_timestamp"]},
+            "recovery": {"safe_retry": "not_applicable_inbound_delivery", "reconciliation": "untrusted_hint_triggers_safe_get_only"},
+            "policy": {"ownership": "sdk_durable_inbox", "validation": "signature_retry_ack_contracts_unverified", "profile": "deferred_rt8"},
+            "live_evidence": {"required": true, "status": "deferred", "requirements": ["signature_contract", "delivery_id", "retry_contract", "acknowledgement_contract", "ordering"], "artifacts": []},
+            "limitations": ["Webhook never terminalizes an operation without a verified read", "Signature, retry or redelivery and acknowledgement contracts are unconfirmed", "KSeF expenses may not emit webhooks"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "master_data.client.sync",
+            "milestone": "later-minor",
+            "classification": "deferred",
+            "transport": {"method": "GET", "endpoint": "/clients.json"},
+            "semantic_writes": {"count": 0, "effects": []},
+            "identity": {"scope": ["provider", "connection", "remote_client_id"], "fingerprint": ["remote_snapshot_hmac"]},
+            "recovery": {"safe_retry": "read_safe_after_contract_gate", "reconciliation": "checkpoint_overlap_remote_id_deduplication_and_periodic_full_audit"},
+            "policy": {"ownership": "sdk_checkpoint", "validation": "not_frozen", "profile": "deferred_rt8"},
+            "live_evidence": {"required": true, "status": "deferred", "requirements": ["stable_order", "pagination", "tombstones"], "artifacts": []},
+            "limitations": ["No generic kernel resource table is allowed"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "master_data.product.sync",
+            "milestone": "later-minor",
+            "classification": "deferred",
+            "transport": {"method": "GET", "endpoint": "/products.json"},
+            "semantic_writes": {"count": 0, "effects": []},
+            "identity": {"scope": ["provider", "connection", "remote_product_id"], "fingerprint": ["remote_snapshot_hmac"]},
+            "recovery": {"safe_retry": "read_safe_after_contract_gate", "reconciliation": "checkpoint_overlap_remote_id_deduplication_and_periodic_full_audit"},
+            "policy": {"ownership": "sdk_checkpoint", "validation": "not_frozen", "profile": "deferred_rt8"},
+            "live_evidence": {"required": true, "status": "deferred", "requirements": ["stable_order", "pagination", "tombstones"], "artifacts": []},
+            "limitations": ["No generic kernel resource table is allowed"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "account.invoice.read",
+            "milestone": "later-minor",
+            "classification": "deferred",
+            "transport": {"method": "GET", "endpoint": "/invoices.json?period=last_month"},
+            "semantic_writes": {"count": 0, "effects": []},
+            "identity": {"scope": ["provider", "connection", "remote_invoice_id"], "fingerprint": ["remote_snapshot_hmac"]},
+            "recovery": {"safe_retry": "read_safe_after_contract_gate", "reconciliation": "pagination_and_remote_id_deduplication"},
+            "policy": {"ownership": "sdk_read_client", "validation": "operator_scope_required", "profile": "deferred_rt8"},
+            "live_evidence": {"required": true, "status": "deferred", "requirements": ["operator_scope", "connection_scope", "pagination"], "artifacts": []},
+            "limitations": ["Global cross-tenant listing is forbidden"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "invoice.update",
+            "milestone": "later-minor",
+            "classification": "deferred",
+            "transport": {"method": "PUT", "endpoint": "/invoices/{id}.json"},
+            "semantic_writes": {"count": 1, "effects": ["invoice_update"]},
+            "identity": {"scope": ["provider", "connection", "remote_invoice_id"], "fingerprint": ["expected_fields", "remote_snapshot_version"]},
+            "recovery": {"safe_retry": "disabled_until_state_preflight_gate", "reconciliation": "expected_remote_state_comparison"},
+            "policy": {"ownership": "not_assigned", "validation": "block_after_ksef_acceptance_and_partial_number_update_contract_unverified", "profile": "deferred_minor"},
+            "live_evidence": {"required": true, "status": "deferred", "requirements": ["preflight_snapshot", "conflict_policy", "post_write_state", "partial_invoice_number_update_contract"], "artifacts": []},
+            "limitations": ["Accepted KSeF documents require correction instead of update", "Invoice number update has only partial provider support and is not a stable managed request"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "invoice.cancel",
+            "milestone": "later-minor",
+            "classification": "deferred",
+            "transport": {"method": "POST", "endpoint": "/invoices/cancel.json"},
+            "semantic_writes": {"count": 1, "effects": ["invoice_cancel"]},
+            "identity": {"scope": ["provider", "connection", "remote_invoice_id"], "fingerprint": ["remote_snapshot_version", "cancellation_eligibility"]},
+            "recovery": {"safe_retry": "never_automatic", "reconciliation": "manual_review_after_ambiguous_destructive_effect"},
+            "policy": {"ownership": "audited_operator", "validation": "destructive_preflight", "profile": "deferred_minor"},
+            "live_evidence": {"required": true, "status": "deferred", "requirements": ["state_eligibility", "no_automatic_retry", "post_effect_read"], "artifacts": []},
+            "limitations": ["The exact route is known, but cancellation eligibility and request or response contracts remain unverified"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "invoice.status.change",
+            "milestone": "later-minor",
+            "classification": "deferred",
+            "transport": {"method": "POST", "endpoint": "/invoices/{id}/change_status.json"},
+            "semantic_writes": {"count": 1, "effects": ["invoice_status_change"]},
+            "identity": {"scope": ["provider", "connection", "remote_invoice_id"], "fingerprint": ["expected_status", "remote_snapshot_version"]},
+            "recovery": {"safe_retry": "disabled_until_state_preflight_gate", "reconciliation": "expected_remote_status_comparison"},
+            "policy": {"ownership": "not_assigned", "validation": "open_status_enum", "profile": "deferred_minor"},
+            "live_evidence": {"required": true, "status": "deferred", "requirements": ["preflight_status", "post_write_status", "conflict_policy"], "artifacts": []},
+            "limitations": ["No stable managed request is published"],
+            "blocks_vat_pilot": false
+        },
+        {
+            "id": "invoice.email.send",
+            "milestone": "later-minor",
+            "classification": "deferred",
+            "transport": {"method": "POST", "endpoint": "/invoices/{id}/send_by_email.json"},
+            "semantic_writes": {"count": 1, "effects": ["invoice_email_send"]},
+            "identity": {"scope": ["provider", "connection", "remote_invoice_id", "message_semantic_slot"], "fingerprint": ["recipient_set_hmac", "template_revision"]},
+            "recovery": {"safe_retry": "never_blind", "reconciliation": "manual_review_unless_provider_delivery_evidence_becomes_exact"},
+            "policy": {"ownership": "application_orchestrator", "validation": "http_and_body_error_contract", "profile": "deferred_minor"},
+            "live_evidence": {"required": true, "status": "deferred", "requirements": ["http_200_error_envelope", "delivery_evidence", "duplicate_send_policy"], "artifacts": []},
+            "limitations": ["Email is not a hidden child operation of issue, KSeF, or PDF"],
+            "blocks_vat_pilot": false
+        }
+    ]
+}

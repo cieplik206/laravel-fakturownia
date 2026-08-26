@@ -1,7 +1,9 @@
 # Security-sensitive package and release surfaces
 /.github/CODEOWNERS @cieplik206
+/.github/release-signers @cieplik206
 /.github/workflows/ @cieplik206
 /composer.json @cieplik206
+/composer.lock @cieplik206
 /.gitignore @cieplik206
 /CHANGELOG.md @cieplik206
 /SECURITY.md @cieplik206

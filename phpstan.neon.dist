@@ -4,8 +4,15 @@ includes:
 
 parameters:
     level: 7
-    phpVersion: 80200
+    phpVersion: 80400
+    configDirectories:
+        - config
+    databaseMigrationsPath:
+        - database/migrations
     paths:
+        - bin
+        - config
+        - database
         - src
         - tests
     tmpDir: build/phpstan

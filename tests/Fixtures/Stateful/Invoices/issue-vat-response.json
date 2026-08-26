@@ -1,0 +1,28 @@
+{
+    "id": 380058094,
+    "number": "FV/TEST/08/2026",
+    "kind": "vat",
+    "status": "issued",
+    "issue_date": "2026-08-26",
+    "buyer_tax_no": "1234567890",
+    "price_gross": "100.00",
+    "currency": "PLN",
+    "oid": "ORDER-123",
+    "positions": [
+        {
+            "name": "Produkt testowy [SKU-1]",
+            "tax": "23",
+            "total_price_gross": "90.00",
+            "quantity": "1",
+            "quantity_unit": "szt."
+        },
+        {
+            "name": "Transport DPD",
+            "tax": "23",
+            "total_price_gross": "10.00",
+            "quantity": "1",
+            "quantity_unit": "szt."
+        }
+    ],
+    "provider_future_field": "preserved"
+}

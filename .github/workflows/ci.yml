@@ -20,6 +20,30 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: fakturownia_testing
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d fakturownia_testing"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      FAKTUROWNIA_TEST_DB_ALLOW_SCHEMA: '1'
+      FAKTUROWNIA_TEST_DB_DATABASE: fakturownia_testing
+      FAKTUROWNIA_TEST_DB_HOST: 127.0.0.1
+      FAKTUROWNIA_TEST_DB_PASSWORD: postgres
+      FAKTUROWNIA_TEST_DB_PORT: '5432'
+      FAKTUROWNIA_TEST_DB_SSLMODE: disable
+      FAKTUROWNIA_TEST_DB_USERNAME: postgres
+
     steps:
       - name: Check out the repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -46,26 +70,29 @@ jobs:
       - name: Run tests
         run: composer test
 
+      - name: Run PostgreSQL tests without skips
+        run: composer test:pgsql
+
       - name: Audit dependencies
         run: composer audit
 
   tests:
-    name: Tests (Laravel ${{ matrix.laravel }}, PHP ${{ matrix.php }})
+    name: Compatibility (${{ matrix.profile }}, PHP ${{ matrix.php }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
         include:
-          - laravel: '11'
-            testbench: '^9.0'
-            php: '8.2'
-          - laravel: '12'
-            testbench: '^10.0'
-            php: '8.3'
-          - laravel: '13'
-            testbench: '^11.0'
+          - profile: minimum
             php: '8.4'
+            command: test:compatibility:min
+          - profile: locked
+            php: '8.4'
+            command: test:compatibility:locked
+          - profile: latest
+            php: '8.5'
+            command: test:compatibility:latest
 
     steps:
       - name: Check out the repository
@@ -78,14 +105,8 @@ jobs:
           coverage: none
           tools: composer:v2
 
-      - name: Install Laravel ${{ matrix.laravel }} dependencies
-        run: >
-          composer update
-          --with "orchestra/testbench:${{ matrix.testbench }}"
-          --prefer-dist --no-interaction --no-progress
-
-      - name: Run tests
-        run: composer test
+      - name: Run ${{ matrix.profile }} compatibility gate
+        run: composer ${{ matrix.command }}
 
   passed:
     name: CI Passed

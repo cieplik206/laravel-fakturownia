@@ -1,0 +1,60 @@
+{
+    "contract": "cieplik206.fakturownia.proforma-request-contract",
+    "version": 1,
+    "evidence_status": "synthetic_deferred_no_live_evidence",
+    "mapping": {
+        "authentication": {
+            "placement": "json_body_top_level",
+            "field": "api_token"
+        },
+        "headers": {
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        },
+        "query": [],
+        "body": {
+            "invoice": {
+                "kind": "proforma",
+                "income": "1",
+                "sell_date": "2026-08-20",
+                "issue_date": "2026-08-26",
+                "buyer_company": true,
+                "department_id": "376237",
+                "buyer_last_name": "",
+                "buyer_name": "Example Buyer Sp. z o.o.",
+                "buyer_tax_no": "PL0000000000",
+                "buyer_post_code": "00-001",
+                "buyer_city": "Warszawa",
+                "buyer_street": "Przykładowa 1",
+                "buyer_country": "PL",
+                "buyer_email": "buyer@example.test",
+                "payment_type": "Przelew",
+                "status": "issued",
+                "paid": "0.00",
+                "description": "Zamówienie testowe PROFORMA-123",
+                "payment_to_kind": "14",
+                "paid_date": null,
+                "positions": [
+                    {
+                        "name": "Produkt testowy [SKU-PRO-1]",
+                        "tax": "23",
+                        "total_price_gross": "90.00",
+                        "quantity": "1",
+                        "quantity_unit": "szt."
+                    },
+                    {
+                        "name": "Transport testowy",
+                        "tax": "23",
+                        "total_price_gross": "10.00",
+                        "quantity": "1",
+                        "quantity_unit": "szt."
+                    }
+                ],
+                "payment_to": "2026-09-09",
+                "buyer_tax_no_kind": "",
+                "buyer_first_name": null,
+                "number": ""
+            }
+        }
+    }
+}

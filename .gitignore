@@ -3,7 +3,6 @@
 /.phpunit.cache/
 /.phpunit.result.cache
 /.phpunit.sandbox.cache/
-/composer.lock
 
 # Local credentials and environment overrides
 /.env

@@ -1,5 +1,5 @@
 {
-    "name": "cieplik206/laravel-fakturownia-client",
+    "name": "cieplik206/laravel-fakturownia",
     "description": "Laravel client for the Fakturownia (InvoiceOcean) REST API",
     "keywords": [
         "api-client",
@@ -10,7 +10,7 @@
         "saloon",
         "php"
     ],
-    "homepage": "https://github.com/cieplik206/laravel-fakturownia-client",
+    "homepage": "https://github.com/cieplik206/laravel-fakturownia",
     "type": "library",
     "license": "MIT",
     "authors": [
@@ -21,17 +21,22 @@
         }
     ],
     "support": {
-        "docs": "https://github.com/cieplik206/laravel-fakturownia-client#readme",
-        "issues": "https://github.com/cieplik206/laravel-fakturownia-client/issues",
-        "security": "https://github.com/cieplik206/laravel-fakturownia-client/security/policy",
-        "source": "https://github.com/cieplik206/laravel-fakturownia-client"
+        "docs": "https://github.com/cieplik206/laravel-fakturownia#readme",
+        "issues": "https://github.com/cieplik206/laravel-fakturownia/issues",
+        "security": "https://github.com/cieplik206/laravel-fakturownia/security/policy",
+        "source": "https://github.com/cieplik206/laravel-fakturownia"
     },
     "require": {
         "ext-curl": "*",
         "ext-json": "*",
-        "php": "^8.2",
-        "illuminate/contracts": "^11.0 || ^12.0 || ^13.0",
-        "illuminate/support": "^11.0 || ^12.0 || ^13.0",
+        "ext-sodium": "*",
+        "php": "^8.4",
+        "cieplik206/laravel-integration-operations": "^0.3",
+        "illuminate/cache": "^13.17",
+        "illuminate/console": "^13.17",
+        "illuminate/contracts": "^13.0",
+        "illuminate/database": "^13.17",
+        "illuminate/support": "^13.0",
         "saloonphp/laravel-plugin": "^4.0",
         "saloonphp/saloon": "^4.0",
         "spatie/laravel-data": "^4.11"
@@ -39,32 +44,63 @@
     "require-dev": {
         "larastan/larastan": "^3.0",
         "laravel/pint": "^1.0",
-        "orchestra/testbench": "^9.0 || ^10.0 || ^11.0",
+        "orchestra/testbench": "^11.0",
         "pestphp/pest": "^5.0",
         "pestphp/pest-plugin-laravel": "^5.0",
         "pestphp/pest-plugin-phpstan": "^5.0"
     },
     "autoload": {
         "psr-4": {
-            "cieplik206\\Fakturownia\\": "src/"
+            "Cieplik206\\Fakturownia\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "cieplik206\\Fakturownia\\Tests\\": "tests/"
+            "Cieplik206\\Fakturownia\\Tests\\": "tests/"
         }
     },
     "extra": {
         "laravel": {
             "providers": [
-                "cieplik206\\Fakturownia\\FakturowniaServiceProvider"
+                "Cieplik206\\Fakturownia\\Laravel\\FakturowniaServiceProvider"
             ]
         }
     },
     "scripts": {
-        "test": "pest",
+        "test": "pest --exclude-group=live --exclude-group=postgres",
+        "test:pgsql": "pest --fail-on-skipped --fail-on-empty-test-suite --group=postgres",
+        "test:compatibility:min": [
+            "@composer update --prefer-lowest --prefer-stable --no-interaction --no-progress",
+            "@test"
+        ],
+        "test:compatibility:locked": [
+            "git ls-files --error-unmatch composer.lock",
+            "@php -r \"if (! is_file('composer.lock')) { fwrite(STDERR, 'A committed composer.lock is required for the locked compatibility gate.'.PHP_EOL); exit(1); }\"",
+            "@composer install --no-interaction --no-progress",
+            "@test"
+        ],
+        "test:compatibility:latest": [
+            "@composer update --prefer-stable --no-interaction --no-progress",
+            "@test"
+        ],
+        "probe:invoice-identity": "pest tests/Contract/InvoiceIdentityContractProbeTest.php",
+        "probe:ksef-demo": "pest tests/Contract/KsefDemoContractProbeTest.php",
         "analyse": "phpstan analyse",
-        "format": "pint src tests"
+        "format": "pint src tests config database bin",
+        "format:check": "pint --test src tests config database bin",
+        "quality:validate": "@composer validate --strict",
+        "security:audit": "@composer audit",
+        "check": [
+            "@quality:validate",
+            "@format:check",
+            "@analyse",
+            "@test",
+            "@test:pgsql",
+            "@security:audit"
+        ]
+    },
+    "replace": {
+        "cieplik206/laravel-fakturownia-client": "self.version"
     },
     "minimum-stability": "stable",
     "prefer-stable": true,

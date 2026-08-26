@@ -1,0 +1,63 @@
+{
+    "contract": "cieplik206.fakturownia.proforma-read-contract",
+    "version": 1,
+    "evidence_status": "synthetic_deferred_no_live_evidence",
+    "list_request": {
+        "method": "GET",
+        "path": "/invoices.json",
+        "query": {
+            "date_from": "2026-08-01",
+            "date_to": "2026-08-31",
+            "include_positions": "true",
+            "income": "yes",
+            "kind": "proforma",
+            "order": "id.asc",
+            "page": 1,
+            "per_page": 2,
+            "period": "more"
+        }
+    },
+    "get_request": {
+        "method": "GET",
+        "path": "/invoices/710001.json",
+        "query": []
+    },
+    "response": {
+        "id": "710001",
+        "number": "PRO/1/08/2026",
+        "kind": "proforma",
+        "status": "future_proforma_state",
+        "issue_date": "2026-08-26",
+        "sell_date": "2026-08-20",
+        "payment_to": "2026-09-09",
+        "payment_type": "Przelew",
+        "price_net": "81.3000",
+        "price_tax": "18.7000",
+        "price_gross": "100.0000",
+        "paid": "0.0000",
+        "currency": "PLN",
+        "buyer_name": "Example Buyer Sp. z o.o.",
+        "buyer_tax_no": "PL0000000000",
+        "buyer_email": "buyer@example.test",
+        "department_id": "376237",
+        "income": true,
+        "cancelled": false,
+        "created_at": "2026-08-26T10:15:00+02:00",
+        "updated_at": "2026-08-26T10:15:00+02:00",
+        "positions": [
+            {
+                "id": "810001",
+                "invoice_id": "710001",
+                "name": "Produkt testowy [SKU-PRO-1]",
+                "quantity": "1.0000",
+                "tax": "23",
+                "total_price_gross": "90.0000",
+                "quantity_unit": "szt.",
+                "future_position_field": "preserved"
+            }
+        ],
+        "future_proforma_field": {
+            "version": 2
+        }
+    }
+}
