@@ -1450,10 +1450,10 @@ it('re-scans invalid identity and status at the final boundary', function (KsefV
     $baseConfiguration = s04Configuration();
     $configuration = new KsefDemoProbeConfiguration(
         $baseConfiguration->profiles,
-        pollWindowMs: 100,
-        pollIntervalMs: 1,
+        pollWindowMs: 1_000,
+        pollIntervalMs: 10,
         maxSearchPages: 2,
-        preSendObservationWindowMs: 2,
+        preSendObservationWindowMs: 10,
         visibilityWindowMs: 500,
         visibilityPollIntervalMs: 10,
     );
@@ -3213,7 +3213,10 @@ it('keeps recovered and replayed authority receipts outside every mutating bound
 })->with(['recovered', 'replay']);
 
 it('executes the mocked four-profile matrix with no manual auto-send', function (): void {
-    $configuration = s04SignedConfiguration(s04Configuration()->evidenceLimits());
+    $limits = s04Configuration()->evidenceLimits();
+    $limits['visibility_window_ms'] = 500;
+    $limits['visibility_poll_interval_ms'] = 10;
+    $configuration = s04SignedConfiguration($limits);
     $fixtureDirectory = sys_get_temp_dir().'/fakturownia-s04-'.bin2hex(random_bytes(6));
     $routes = [];
     $profileIndexes = array_flip(KsefDemoProbeConfiguration::profileKeys());

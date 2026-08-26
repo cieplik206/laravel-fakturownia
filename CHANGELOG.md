@@ -7,6 +7,15 @@ Versioning.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-08-26
+
+### Fixed
+
+- Integrity-pin canonical regular targets of loaded PHP INI symlinks so the
+  live-evidence runtime snapshot remains safe and portable across CI runtimes.
+- Install the POSIX extension explicitly in every CI profile required by the
+  fail-closed pre-autoload supervisor tests.
+
 ## [0.1.0] - 2026-08-26
 
 ### Added

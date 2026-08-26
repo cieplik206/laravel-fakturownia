@@ -2512,12 +2512,7 @@ final class LiveEvidenceAttestationGuard
         $iniFiles = [];
 
         foreach (array_values(array_unique($iniPaths)) as $iniPath) {
-            $resolved = realpath($iniPath);
-            $contents = $resolved === false || is_link($iniPath) ? false : file_get_contents($resolved);
-
-            if ($resolved === false || $contents === false || ! is_file($resolved)) {
-                throw new RuntimeException('A loaded PHP configuration file cannot be integrity-pinned.');
-            }
+            ['path' => $resolved, 'contents' => $contents] = self::readRuntimeConfigurationFile($iniPath);
 
             $iniFiles[] = ['path_sha256' => hash('sha256', $resolved), 'sha256' => hash('sha256', $contents)];
         }
@@ -2538,6 +2533,47 @@ final class LiveEvidenceAttestationGuard
                 'version' => phpversion($extension) ?: null,
             ], $extensions),
         ];
+    }
+
+    /** @return array{path: string, contents: string} */
+    private static function readRuntimeConfigurationFile(string $path): array
+    {
+        $resolved = realpath($path);
+        $metadata = $resolved === false ? false : self::filesystemMetadata($resolved);
+        $handle = $resolved === false ? false : fopen($resolved, 'rb');
+
+        if ($resolved === false
+            || ! is_array($metadata)
+            || ($metadata['mode'] & 0170000) !== 0100000
+            || $handle === false) {
+            throw new RuntimeException('A loaded PHP configuration file cannot be integrity-pinned.');
+        }
+
+        try {
+            $opened = fstat($handle);
+            $contents = stream_get_contents($handle);
+            $finished = fstat($handle);
+            $current = self::filesystemMetadata($resolved);
+        } finally {
+            fclose($handle);
+        }
+
+        if ($opened === false
+            || $contents === false
+            || $finished === false
+            || ! is_array($current)
+            || ($opened['mode'] & 0170000) !== 0100000
+            || $metadata['dev'] !== $opened['dev']
+            || $metadata['ino'] !== $opened['ino']
+            || $opened['dev'] !== $finished['dev']
+            || $opened['ino'] !== $finished['ino']
+            || $opened['dev'] !== $current['dev']
+            || $opened['ino'] !== $current['ino']
+            || strlen($contents) !== $opened['size']) {
+            throw new RuntimeException('A loaded PHP configuration file cannot be integrity-pinned.');
+        }
+
+        return ['path' => $resolved, 'contents' => $contents];
     }
 
     private static function trustedExecutableSha256(string $path): string
