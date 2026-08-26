@@ -1397,8 +1397,8 @@ it('rejects a valid-invoice duplicate that appears after the initial visibility 
         pollIntervalMs: 1,
         maxSearchPages: 2,
         preSendObservationWindowMs: 2,
-        visibilityWindowMs: 10,
-        visibilityPollIntervalMs: 1,
+        visibilityWindowMs: 500,
+        visibilityPollIntervalMs: 10,
     );
     $profile = $configuration->profiles['explicit_block'];
     $method = new ReflectionMethod(KsefDemoContractProbe::class, 'profileEvidence');

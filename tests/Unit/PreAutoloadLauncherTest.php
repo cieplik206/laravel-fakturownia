@@ -16,6 +16,7 @@ declare(strict_types=1);
  *     source: string,
  *     source_original: string,
  *     manifest_sha256: string,
+ *     php_executable: string,
  *     php_arguments: list<string>
  * }
  */
@@ -83,10 +84,16 @@ function fakturowniaPreAutoloadFixture(?string $signedMutation = null): array
     $publicKey = \sodium_crypto_sign_publickey($keyPair);
     fakturowniaPreAutoloadWrite($publicKeyPath, $publicKey, 0o444);
 
-    $phpExecutable = \realpath(\PHP_BINARY);
+    $phpExecutableSource = \realpath(\PHP_BINARY);
 
-    if (! \is_string($phpExecutable)) {
+    if (! \is_string($phpExecutableSource)) {
         throw new RuntimeException('Cannot resolve the PHP executable.');
+    }
+
+    $phpExecutable = "{$base}/php-runtime";
+
+    if (! \copy($phpExecutableSource, $phpExecutable) || ! \chmod($phpExecutable, 0o555)) {
+        throw new RuntimeException('Cannot create the trusted PHP runtime fixture.');
     }
 
     $phpRuntime = fakturowniaPreAutoloadPhpRuntime();
@@ -332,6 +339,7 @@ PHP;
         'source' => "{$snapshot}/src/Example.php",
         'source_original' => $sourceOriginal,
         'manifest_sha256' => $manifestSha256,
+        'php_executable' => $phpExecutable,
         'php_arguments' => $phpRuntime['arguments'],
     ];
 }
@@ -342,6 +350,7 @@ PHP;
  *     credential: string,
  *     authorization: string,
  *     manifest_sha256: string,
+ *     php_executable: string,
  *     php_arguments: list<string>
  * } $fixture
  * @return array{exit_code: int, stdout: string, stderr: string}
@@ -349,7 +358,7 @@ PHP;
 function fakturowniaRunPreAutoloadLauncher(array $fixture): array
 {
     $command = [
-        \PHP_BINARY,
+        $fixture['php_executable'],
         ...$fixture['php_arguments'],
         $fixture['launcher'],
         "--manifest-sha256={$fixture['manifest_sha256']}",
