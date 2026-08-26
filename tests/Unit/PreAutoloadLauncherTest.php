@@ -21,10 +21,10 @@ declare(strict_types=1);
  */
 function fakturowniaPreAutoloadFixture(?string $signedMutation = null): array
 {
-    $temporaryRoot = \realpath(\sys_get_temp_dir());
+    $temporaryRoot = \realpath(\dirname(__DIR__, 2));
 
     if (! \is_string($temporaryRoot)) {
-        throw new RuntimeException('Cannot resolve the system temporary directory.');
+        throw new RuntimeException('Cannot resolve the repository test directory.');
     }
 
     $base = $temporaryRoot.'/fakturownia-preautoload-'.\bin2hex(\random_bytes(12));
