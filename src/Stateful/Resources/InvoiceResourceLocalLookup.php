@@ -31,7 +31,7 @@ final readonly class InvoiceResourceLocalLookup
         public VersionedHmacDigest $activeDigest,
         array $digests,
     ) {
-        if ($referenceType !== InvoiceResource::LocalReferenceType
+        if (! in_array($referenceType, InvoiceResource::localReferenceTypes(), true)
             || $activeDigest->domain !== LookupHmacDomain::Intent
             || count($digests) > self::MaximumReadableDigests) {
             throw new InvalidArgumentException('Invoice resource local lookup metadata is invalid.');
@@ -62,10 +62,20 @@ final readonly class InvoiceResourceLocalLookup
 
     public static function forTransactionOrder(HmacSha256 $hmac, string $reference): self
     {
+        return self::forReference($hmac, InvoiceResource::LocalReferenceType, $reference);
+    }
+
+    public static function forCustomerReturn(HmacSha256 $hmac, string $reference): self
+    {
+        return self::forReference($hmac, InvoiceResource::CorrectionLocalReferenceType, $reference);
+    }
+
+    private static function forReference(HmacSha256 $hmac, string $referenceType, string $reference): self
+    {
         self::assertReference($reference);
         $material = (new CanonicalJsonV1)->encode(new CanonicalObject([
             'protocol' => self::Protocol,
-            'reference_type' => InvoiceResource::LocalReferenceType,
+            'reference_type' => $referenceType,
             'reference' => $reference,
         ]));
         $active = $hmac->digest(LookupHmacDomain::Intent, $material);
@@ -75,7 +85,7 @@ final readonly class InvoiceResourceLocalLookup
             throw new InvalidArgumentException('Invoice resource local lookup has no readable HMAC version.');
         }
 
-        return new self(InvoiceResource::LocalReferenceType, $active, $readable);
+        return new self($referenceType, $active, $readable);
     }
 
     /** @return array{reference_type: string, reference: string, digest_versions: list<int>} */
@@ -98,7 +108,7 @@ final readonly class InvoiceResourceLocalLookup
             || strlen($reference) > 256
             || preg_match('//u', $reference) !== 1
             || preg_match('/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u', $reference) === 1) {
-            throw new InvalidArgumentException('Invoice resource transaction-order reference is invalid.');
+            throw new InvalidArgumentException('Invoice resource local reference is invalid.');
         }
     }
 }

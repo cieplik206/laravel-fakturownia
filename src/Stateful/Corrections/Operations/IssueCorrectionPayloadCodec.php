@@ -9,23 +9,39 @@ use Cieplik206\Fakturownia\Stateful\Corrections\CorrectionLine;
 use Cieplik206\Fakturownia\Stateful\Corrections\CorrectionLineMode;
 use Cieplik206\Fakturownia\Stateful\Corrections\CorrectionPositionAttributes;
 use Cieplik206\Fakturownia\Stateful\Corrections\CorrectionPositionKind;
+use Cieplik206\Fakturownia\Stateful\Invoices\Identity\OidUniquenessGate;
+use Cieplik206\Fakturownia\Stateful\Invoices\Identity\RemoteIdentityPolicy;
+use Cieplik206\Fakturownia\Stateful\Invoices\Identity\RemoteIdentityScope;
+use Cieplik206\Fakturownia\Stateful\Invoices\Identity\RemoteInvoiceIdentity;
 use Cieplik206\Fakturownia\Stateful\Invoices\InvoiceBuyer;
 use Cieplik206\Fakturownia\Stateful\Invoices\Money;
+use Cieplik206\IntegrationOperations\Contracts\OperationPayloadCodec;
 use Cieplik206\IntegrationOperations\Crypto\CanonicalJsonV1;
 use Cieplik206\IntegrationOperations\Crypto\CanonicalObject;
+use Cieplik206\IntegrationOperations\ValueObjects\ConnectionKey;
 use InvalidArgumentException;
 use JsonException;
 
-final readonly class IssueCorrectionPayloadCodec
+final readonly class IssueCorrectionPayloadCodec implements OperationPayloadCodec
 {
-    public const int SchemaVersion = 1;
+    public const int SchemaVersion = 2;
 
     public const string WriteActivationSlot = 'invoice.correction.issue';
 
     private const int MaximumPayloadBytes = 262_144;
 
     /** @var list<string> */
-    private const array PayloadKeys = ['schema_version', 'write_activation_slot', 'correction'];
+    private const array PayloadKeys = ['schema_version', 'write_activation_slot', 'identity', 'correction'];
+
+    /** @var list<string> */
+    private const array IdentityKeys = [
+        'connection_key',
+        'document_kind',
+        'department_id',
+        'policy',
+        'oid',
+        'transaction_order_reference',
+    ];
 
     /** @var list<string> */
     private const array CorrectionKeys = [
@@ -95,6 +111,7 @@ final readonly class IssueCorrectionPayloadCodec
         $payload = new CanonicalObject([
             'schema_version' => self::schemaVersion(),
             'write_activation_slot' => self::WriteActivationSlot,
+            'identity' => $this->encodeIdentity($command->identity),
             'correction' => $this->encodeDraft($command->draft),
         ]);
 
@@ -116,7 +133,10 @@ final readonly class IssueCorrectionPayloadCodec
             throw new InvalidArgumentException('Issue correction payload uses an unsupported write activation slot.');
         }
 
-        return new IssueCorrectionCommand($this->decodeDraft($payload->values['correction']));
+        return new IssueCorrectionCommand(
+            $this->decodeDraft($payload->values['correction']),
+            $this->decodeIdentity($payload->values['identity']),
+        );
     }
 
     public function canonicalize(CanonicalObject $payload): CanonicalObject
@@ -129,6 +149,19 @@ final readonly class IssueCorrectionPayloadCodec
         $this->decode($payload);
 
         return self::WriteActivationSlot;
+    }
+
+    /** @return array<string, mixed> */
+    private function encodeIdentity(RemoteInvoiceIdentity $identity): array
+    {
+        return [
+            'connection_key' => $identity->scope->connection->value,
+            'document_kind' => $identity->scope->documentKind,
+            'department_id' => $identity->scope->departmentId,
+            'policy' => $identity->policy->value,
+            'oid' => $identity->oid(),
+            'transaction_order_reference' => $identity->transactionOrderReference(),
+        ];
     }
 
     /** @return array<string, mixed> */
@@ -235,6 +268,65 @@ final readonly class IssueCorrectionPayloadCodec
             issueDate: $this->nullableString($correction['issue_date'], 'correction.issue_date'),
             sellDate: $this->nullableString($correction['sell_date'], 'correction.sell_date'),
             clientId: $this->nullableString($correction['client_id'], 'correction.client_id'),
+        );
+    }
+
+    private function decodeIdentity(mixed $payload): RemoteInvoiceIdentity
+    {
+        $identity = $this->object($payload, 'identity');
+        $this->assertExactKeys($identity, self::IdentityKeys, 'identity');
+        $scope = new RemoteIdentityScope(
+            new ConnectionKey($this->string($identity['connection_key'], 'identity.connection_key')),
+            $this->string($identity['document_kind'], 'identity.document_kind'),
+            $this->string($identity['department_id'], 'identity.department_id'),
+        );
+        $policy = RemoteIdentityPolicy::tryFrom($this->string($identity['policy'], 'identity.policy'));
+        $oid = $this->nullableString($identity['oid'], 'identity.oid');
+        $localReference = $this->nullableString(
+            $identity['transaction_order_reference'],
+            'identity.transaction_order_reference',
+        );
+
+        return match ($policy) {
+            RemoteIdentityPolicy::BusinessOid => $this->businessIdentity($scope, $oid, $localReference),
+            RemoteIdentityPolicy::TechnicalOidWithTransactionOrder => $this->technicalIdentity(
+                $scope,
+                $oid,
+                $localReference,
+            ),
+            RemoteIdentityPolicy::NoRemoteUniqueness => throw new InvalidArgumentException(
+                'Issue correction identity must carry a stable local return reference.',
+            ),
+            null => throw new InvalidArgumentException('Issue correction payload identity policy is unsupported.'),
+        };
+    }
+
+    private function businessIdentity(
+        RemoteIdentityScope $scope,
+        ?string $oid,
+        ?string $localReference,
+    ): RemoteInvoiceIdentity {
+        if ($oid === null || $localReference !== $oid) {
+            throw new InvalidArgumentException('Issue correction business identity is incomplete or inconsistent.');
+        }
+
+        return RemoteInvoiceIdentity::businessOid($scope, $oid, OidUniquenessGate::notPassed());
+    }
+
+    private function technicalIdentity(
+        RemoteIdentityScope $scope,
+        ?string $oid,
+        ?string $localReference,
+    ): RemoteInvoiceIdentity {
+        if ($oid === null || $localReference === null) {
+            throw new InvalidArgumentException('Issue correction technical identity is incomplete.');
+        }
+
+        return RemoteInvoiceIdentity::technicalOidWithTransactionOrder(
+            $scope,
+            $oid,
+            $localReference,
+            OidUniquenessGate::notPassed(),
         );
     }
 

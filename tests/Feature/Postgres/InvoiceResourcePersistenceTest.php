@@ -4,8 +4,15 @@ declare(strict_types=1);
 
 use Cieplik206\Fakturownia\Laravel\Resources\DatabaseInvoiceResourceStore;
 use Cieplik206\Fakturownia\Laravel\Resources\SodiumInvoiceResourceSnapshotProtector;
+use Cieplik206\Fakturownia\Stateful\Corrections\CorrectionResourceProjectionMapper;
+use Cieplik206\Fakturownia\Stateful\Corrections\Operations\IssueCorrectionCommand;
+use Cieplik206\Fakturownia\Stateful\Corrections\Operations\IssueCorrectionOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Corrections\Operations\IssueCorrectionPayloadCodec;
+use Cieplik206\Fakturownia\Stateful\Corrections\Operations\IssueCorrectionResult;
 use Cieplik206\Fakturownia\Stateful\Invoices\Identity\OidUniquenessGate;
+use Cieplik206\Fakturownia\Stateful\Invoices\Identity\RemoteIdentityScope;
 use Cieplik206\Fakturownia\Stateful\Invoices\Identity\RemoteInvoiceIdentity;
+use Cieplik206\Fakturownia\Stateful\Invoices\Money;
 use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceCommand;
 use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoicePayloadCodec;
 use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceResult;
@@ -13,6 +20,7 @@ use Cieplik206\Fakturownia\Stateful\Resources\Exceptions\InvoiceResourceProjecti
 use Cieplik206\Fakturownia\Stateful\Resources\InvoiceResource;
 use Cieplik206\Fakturownia\Stateful\Resources\InvoiceResourceProjectionPlan;
 use Cieplik206\Fakturownia\Stateful\Resources\IssueInvoiceResourceProjectionMapper;
+use Cieplik206\Fakturownia\Tests\Support\Stateful\CorrectionFixtures;
 use Cieplik206\Fakturownia\Tests\Support\Stateful\InvoiceFixtures;
 use Cieplik206\IntegrationOperations\Context\IntegrationContext;
 use Cieplik206\IntegrationOperations\Contracts\OperationView;
@@ -37,6 +45,7 @@ final readonly class S48InvoiceResourceOperationView implements OperationView
     public function __construct(
         private OperationId $id,
         private CanonicalObject $canonicalPayload,
+        private string $type = 'fakturownia.invoice.issue',
     ) {}
 
     public function operationId(): OperationId
@@ -51,7 +60,7 @@ final readonly class S48InvoiceResourceOperationView implements OperationView
 
     public function operationType(): OperationType
     {
-        return new OperationType('fakturownia.invoice.issue');
+        return new OperationType($this->type);
     }
 
     public function context(): IntegrationContext
@@ -162,6 +171,31 @@ function s48ProjectionPlan(
     return (new IssueInvoiceResourceProjectionMapper(InvoiceFixtures::hmac()))->map($operation, $result);
 }
 
+function s48CorrectionProjectionPlan(string $operationId): InvoiceResourceProjectionPlan
+{
+    $draft = CorrectionFixtures::draft();
+    $identity = RemoteInvoiceIdentity::technicalOidWithTransactionOrder(
+        new RemoteIdentityScope(new ConnectionKey('sales'), 'correction', (string) $draft->departmentId),
+        'OID-RETURN-123',
+        'RETURN-123',
+        OidUniquenessGate::notPassed(),
+    );
+    $operation = new S48InvoiceResourceOperationView(
+        new OperationId($operationId),
+        (new IssueCorrectionPayloadCodec)->encode(new IssueCorrectionCommand($draft, $identity)),
+        IssueCorrectionOperationDefinitionProvider::OperationType,
+    );
+    $result = new IssueCorrectionResult(
+        remoteId: 'correction-9001',
+        sourceInvoiceId: $draft->sourceInvoiceId,
+        number: 'KOR/2026/08/1',
+        status: 'issued',
+        totalGross: Money::fromDecimal('-50.00', 'PLN'),
+    );
+
+    return (new CorrectionResourceProjectionMapper(InvoiceFixtures::hmac()))->map($operation, $result);
+}
+
 it('projects and authenticates one idempotent invoice resource in real PostgreSQL', function (): void {
     $databaseManager = app(DatabaseManager::class);
     $configuration = app(Repository::class);
@@ -228,7 +262,23 @@ it('projects and authenticates one idempotent invoice resource in real PostgreSQ
                 [],
             ))->toThrow(LogicException::class);
 
-        $stored = $connection->table('fakturownia_resources')->first();
+        $correctionPlan = s48CorrectionProjectionPlan((string) new Ulid);
+        $correction = $connection->transaction(
+            fn (): InvoiceResource => $store->apply($correctionPlan),
+        );
+
+        expect($correction->localReferenceType)->toBe('customer_return')
+            ->and($correction->snapshot)->toBeInstanceOf(IssueCorrectionResult::class)
+            ->and($store->findByRemoteId($correctionPlan->connectionKey, 'correction-9001'))->toEqual($correction)
+            ->and($store->findByLocalReferenceDigests(
+                $correctionPlan->connectionKey,
+                'customer_return',
+                [$correctionPlan->localReferenceHmac],
+            ))->toEqual($correction)
+            ->and($connection->table('fakturownia_resources')->count())->toBe(2)
+            ->and($connection->table('fakturownia_resource_local_lookups')->count())->toBe(2);
+
+        $stored = $connection->table('fakturownia_resources')->where('id', $plan->resourceId->value)->first();
         expect($stored)->toBeInstanceOf(stdClass::class)
             ->and($stored->snapshot_cipher ?? null)->toBe('XCHACHA20-POLY1305')
             ->and($stored->snapshot_ciphertext ?? null)->not->toContain('FV/2026/08/1')
@@ -252,7 +302,7 @@ it('projects and authenticates one idempotent invoice resource in real PostgreSQ
 
             throw new RuntimeException('force terminal transaction rollback');
         }))->toThrow(RuntimeException::class, 'force terminal transaction rollback')
-            ->and($connection->table('fakturownia_resources')->count())->toBe(1);
+            ->and($connection->table('fakturownia_resources')->count())->toBe(2);
 
         $ciphertext = $stored->snapshot_ciphertext ?? null;
         if (! is_string($ciphertext) || $ciphertext === '') {

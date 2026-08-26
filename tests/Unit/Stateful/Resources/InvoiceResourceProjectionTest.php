@@ -74,7 +74,7 @@ final class S46InMemoryInvoiceResourceStore implements InvoiceResourceProjection
 
     public function apply(InvoiceResourceProjectionPlan $plan): InvoiceResource
     {
-        $remoteKey = $plan->connectionKey->value."\0".$plan->snapshot->remoteId;
+        $remoteKey = $plan->connectionKey->value."\0".$plan->snapshot->remoteId();
         $localKey = $plan->connectionKey->value."\0".$plan->localReferenceType."\0".$plan->localReferenceHmac->hex;
         $existing = $this->resources[$remoteKey] ?? $this->resources[$localKey] ?? null;
 
@@ -90,8 +90,8 @@ final class S46InMemoryInvoiceResourceStore implements InvoiceResourceProjection
             connectionKey: $plan->connectionKey,
             localReferenceType: $plan->localReferenceType,
             localReferenceHmac: $plan->localReferenceHmac,
-            remoteId: $plan->snapshot->remoteId,
-            remoteNumber: $plan->snapshot->number,
+            remoteId: $plan->snapshot->remoteId(),
+            remoteNumber: $plan->snapshot->remoteNumber(),
             createdByOperationId: $plan->operationId,
             lastOperationId: $plan->operationId,
             snapshot: $plan->snapshot,

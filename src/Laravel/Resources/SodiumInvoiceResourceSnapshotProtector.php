@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Cieplik206\Fakturownia\Laravel\Resources;
 
-use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceResult;
-use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceResultCodec;
+use Cieplik206\Fakturownia\Stateful\Resources\Contracts\InvoiceResourceSnapshot;
 use Cieplik206\Fakturownia\Stateful\Resources\Contracts\InvoiceResourceSnapshotProtector;
 use Cieplik206\Fakturownia\Stateful\Resources\InvoiceResourceId;
 use Cieplik206\Fakturownia\Stateful\Resources\InvoiceResourceProjectionPlan;
+use Cieplik206\Fakturownia\Stateful\Resources\InvoiceResourceSnapshotCodec;
 use Cieplik206\Fakturownia\Stateful\Resources\ProtectedInvoiceResourceSnapshot;
 use Cieplik206\IntegrationOperations\Crypto\CanonicalJsonV1;
 use Cieplik206\IntegrationOperations\Crypto\CanonicalObject;
@@ -45,7 +45,7 @@ final class SodiumInvoiceResourceSnapshotProtector implements InvoiceResourceSna
 
     public function protect(InvoiceResourceProjectionPlan $plan): ProtectedInvoiceResourceSnapshot
     {
-        $codec = new IssueInvoiceResultCodec;
+        $codec = new InvoiceResourceSnapshotCodec;
         $plaintext = (new CanonicalJsonV1)->encode(new CanonicalObject($codec->encode($plan->snapshot)->toArray()));
         $nonce = random_bytes(SODIUM_CRYPTO_AEAD_XCHACHA20POLY1305_IETF_NPUBBYTES);
         $key = $this->key($this->activeVersion);
@@ -85,7 +85,7 @@ final class SodiumInvoiceResourceSnapshotProtector implements InvoiceResourceSna
         ConnectionKey $connectionKey,
         OperationId $operationId,
         ProtectedInvoiceResourceSnapshot $snapshot,
-    ): IssueInvoiceResult {
+    ): InvoiceResourceSnapshot {
         $key = $this->key($snapshot->encryptionKeyVersion);
 
         try {
@@ -119,13 +119,7 @@ final class SodiumInvoiceResourceSnapshotProtector implements InvoiceResourceSna
             throw new InvalidArgumentException('The invoice resource snapshot envelope is invalid.');
         }
 
-        $result = (new IssueInvoiceResultCodec)->decode(EncodedResult::fromArray($decoded));
-
-        if (! $result instanceof IssueInvoiceResult) {
-            throw new LogicException('The invoice resource result codec returned an invalid type.');
-        }
-
-        return $result;
+        return (new InvoiceResourceSnapshotCodec)->decode(EncodedResult::fromArray($decoded));
     }
 
     /** @return never */

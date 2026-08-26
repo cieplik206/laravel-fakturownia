@@ -43,6 +43,23 @@ use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\InvoicePdfOutcomeProjec
 use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\InvoicePdfReadyResultCodec;
 use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\InvoicePdfStager;
 use Cieplik206\Fakturownia\Stateful\Contracts\ConnectionResolver;
+use Cieplik206\Fakturownia\Stateful\Corrections\CorrectionResourceProjectionMapper;
+use Cieplik206\Fakturownia\Stateful\Corrections\Operations\AuthoritativeIssueCorrectionFailureClassifier;
+use Cieplik206\Fakturownia\Stateful\Corrections\Operations\AuthoritativeIssueCorrectionOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Corrections\Operations\AuthoritativeIssueCorrectionReconciliationStrategy;
+use Cieplik206\Fakturownia\Stateful\Corrections\Operations\AuthoritativeIssueCorrectionRetryPolicy;
+use Cieplik206\Fakturownia\Stateful\Corrections\Operations\Contracts\IssueCorrectionTransport;
+use Cieplik206\Fakturownia\Stateful\Corrections\Operations\DisabledIssueCorrectionTransport;
+use Cieplik206\Fakturownia\Stateful\Corrections\Operations\IssueCorrectionFailureClassifier;
+use Cieplik206\Fakturownia\Stateful\Corrections\Operations\IssueCorrectionOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Corrections\Operations\IssueCorrectionOperationFactory;
+use Cieplik206\Fakturownia\Stateful\Corrections\Operations\IssueCorrectionOperationHandler;
+use Cieplik206\Fakturownia\Stateful\Corrections\Operations\IssueCorrectionOutcomeProjectionPlanner;
+use Cieplik206\Fakturownia\Stateful\Corrections\Operations\IssueCorrectionOutcomeProjector;
+use Cieplik206\Fakturownia\Stateful\Corrections\Operations\IssueCorrectionPayloadCodec;
+use Cieplik206\Fakturownia\Stateful\Corrections\Operations\IssueCorrectionReconciliationStrategy;
+use Cieplik206\Fakturownia\Stateful\Corrections\Operations\IssueCorrectionResultCodec;
+use Cieplik206\Fakturownia\Stateful\Corrections\Operations\IssueCorrectionRetryPolicy;
 use Cieplik206\Fakturownia\Stateful\Diagnostics\FakturowniaDiagnosticDefinitionProvider;
 use Cieplik206\Fakturownia\Stateful\Diagnostics\FakturowniaDiagnosticProviderExtensions;
 use Cieplik206\Fakturownia\Stateful\FakturowniaManager;
@@ -53,6 +70,7 @@ use Cieplik206\Fakturownia\Stateful\Invoices\Operations\Contracts\IssueInvoiceTr
 use Cieplik206\Fakturownia\Stateful\Invoices\Operations\DisabledIssueInvoiceTransport;
 use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceFailureClassifier;
 use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceOperationFactory;
 use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceOperationHandler;
 use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceOutcomeProjectionPlanner;
 use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceOutcomeProjector;
@@ -118,6 +136,7 @@ final class FakturowniaServiceProvider extends ServiceProvider
         );
         $this->app->singleton(FakturowniaDiagnosticProviderExtensions::class);
         $this->app->singleton(IssueInvoicePayloadCodec::class);
+        $this->app->singleton(IssueInvoiceOperationFactory::class);
         $this->app->singleton(IssueInvoiceOperationHandler::class);
         $this->app->singleton(IssueInvoiceFailureClassifier::class);
         $this->app->singleton(AuthoritativeIssueInvoiceFailureClassifier::class);
@@ -144,6 +163,22 @@ final class FakturowniaServiceProvider extends ServiceProvider
         $this->app->singleton(DatabaseInvoiceResourceStore::class);
         $this->app->alias(DatabaseInvoiceResourceStore::class, InvoiceResourceProjectionStore::class);
         $this->app->alias(DatabaseInvoiceResourceStore::class, InvoiceResourceReader::class);
+
+        $this->app->singleton(IssueCorrectionPayloadCodec::class);
+        $this->app->singleton(IssueCorrectionOperationFactory::class);
+        $this->app->singleton(IssueCorrectionOperationHandler::class);
+        $this->app->singleton(IssueCorrectionFailureClassifier::class);
+        $this->app->singleton(AuthoritativeIssueCorrectionFailureClassifier::class);
+        $this->app->singleton(IssueCorrectionRetryPolicy::class);
+        $this->app->singleton(AuthoritativeIssueCorrectionRetryPolicy::class);
+        $this->app->singleton(IssueCorrectionReconciliationStrategy::class);
+        $this->app->singleton(AuthoritativeIssueCorrectionReconciliationStrategy::class);
+        $this->app->singleton(IssueCorrectionResultCodec::class);
+        $this->app->singleton(IssueCorrectionOutcomeProjector::class);
+        $this->app->singleton(IssueCorrectionOutcomeProjectionPlanner::class);
+        $this->app->singleton(CorrectionResourceProjectionMapper::class);
+        $this->app->singleton(DisabledIssueCorrectionTransport::class);
+        $this->app->alias(DisabledIssueCorrectionTransport::class, IssueCorrectionTransport::class);
 
         $this->app->singleton(EnsureAcceptedPayloadCodec::class);
         $this->app->singleton(EnsureAcceptedOperationFactory::class);
@@ -213,6 +248,8 @@ final class FakturowniaServiceProvider extends ServiceProvider
         $operations->registerProvider(FakturowniaDiagnosticDefinitionProvider::class);
         $operations->registerProvider(IssueInvoiceOperationDefinitionProvider::class);
         $operations->registerAuthoritativeProvider(AuthoritativeIssueInvoiceOperationDefinitionProvider::class);
+        $operations->registerProvider(IssueCorrectionOperationDefinitionProvider::class);
+        $operations->registerAuthoritativeProvider(AuthoritativeIssueCorrectionOperationDefinitionProvider::class);
         $operations->registerProvider(EnsureAcceptedOperationDefinitionProvider::class);
         $operations->registerAuthoritativeProvider(AuthoritativeEnsureAcceptedOperationDefinitionProvider::class);
         $operations->registerProvider(DownloadInvoicePdfOperationDefinitionProvider::class);

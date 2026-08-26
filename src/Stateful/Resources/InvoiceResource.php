@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Cieplik206\Fakturownia\Stateful\Resources;
 
-use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceResult;
+use Cieplik206\Fakturownia\Stateful\Resources\Contracts\InvoiceResourceSnapshot;
 use Cieplik206\Fakturownia\Stateful\Support\RejectsNativeSerialization;
 use Cieplik206\IntegrationOperations\Enums\LookupHmacDomain;
 use Cieplik206\IntegrationOperations\ValueObjects\ConnectionKey;
@@ -21,6 +21,8 @@ final readonly class InvoiceResource
 
     public const string LocalReferenceType = 'transaction_order';
 
+    public const string CorrectionLocalReferenceType = 'customer_return';
+
     public function __construct(
         public InvoiceResourceId $id,
         public ConnectionKey $connectionKey,
@@ -30,7 +32,7 @@ final readonly class InvoiceResource
         public string $remoteNumber,
         public OperationId $createdByOperationId,
         public OperationId $lastOperationId,
-        public IssueInvoiceResult $snapshot,
+        public InvoiceResourceSnapshot $snapshot,
         public VersionedHmacDigest $snapshotFingerprint,
         public int $rowVersion,
         public DateTimeImmutable $createdAt,
@@ -39,12 +41,12 @@ final readonly class InvoiceResource
         public ?DateTimeImmutable $remoteUpdatedAt = null,
         public ?DateTimeImmutable $deletedRemotelyAt = null,
     ) {
-        if ($localReferenceType !== self::LocalReferenceType
-            || $localReferenceHmac->domain !== LookupHmacDomain::Intent
+        if ($localReferenceHmac->domain !== LookupHmacDomain::Intent
             || $snapshotFingerprint->domain !== LookupHmacDomain::Payload
             || $rowVersion < 1
-            || ! hash_equals($remoteId, $snapshot->remoteId)
-            || ! hash_equals($remoteNumber, $snapshot->number)) {
+            || ! in_array($localReferenceType, self::localReferenceTypes(), true)
+            || ! hash_equals($remoteId, $snapshot->remoteId())
+            || ! hash_equals($remoteNumber, $snapshot->remoteNumber())) {
             throw new InvalidArgumentException('Invoice resource identity or projection metadata is invalid.');
         }
 
@@ -67,6 +69,12 @@ final readonly class InvoiceResource
                 throw new InvalidArgumentException('Invoice resource remote deletion predates its last observation.');
             }
         }
+    }
+
+    /** @return non-empty-list<string> */
+    public static function localReferenceTypes(): array
+    {
+        return [self::LocalReferenceType, self::CorrectionLocalReferenceType];
     }
 
     /** @return array{resource_type: string, connection: string, remote_id: string, local_reference: string, snapshot: string} */

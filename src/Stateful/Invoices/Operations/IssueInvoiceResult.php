@@ -7,10 +7,10 @@ namespace Cieplik206\Fakturownia\Stateful\Invoices\Operations;
 use Cieplik206\Fakturownia\Stateful\Invoices\InvoiceLine;
 use Cieplik206\Fakturownia\Stateful\Invoices\IssuedInvoiceResult;
 use Cieplik206\Fakturownia\Stateful\Invoices\Money;
+use Cieplik206\Fakturownia\Stateful\Resources\Contracts\InvoiceResourceSnapshot;
 use Cieplik206\Fakturownia\Stateful\Support\RejectsNativeSerialization;
-use Cieplik206\IntegrationOperations\Contracts\OperationResult;
 
-final readonly class IssueInvoiceResult implements OperationResult
+final readonly class IssueInvoiceResult implements InvoiceResourceSnapshot
 {
     use RejectsNativeSerialization;
 
@@ -64,6 +64,16 @@ final readonly class IssueInvoiceResult implements OperationResult
     public function resultType(): string
     {
         return IssueInvoiceResultCodec::resultType();
+    }
+
+    public function remoteId(): string
+    {
+        return $this->remoteId;
+    }
+
+    public function remoteNumber(): string
+    {
+        return $this->number;
     }
 
     public function toIssuedInvoiceResult(): IssuedInvoiceResult

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Cieplik206\Fakturownia\Stateful\Corrections;
 
 use Cieplik206\Fakturownia\Stateful\Invoices\InvoiceBuyer;
+use Cieplik206\Fakturownia\Stateful\Invoices\Money;
 use Cieplik206\Fakturownia\Stateful\Support\RejectsNativeSerialization;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -86,6 +87,21 @@ final readonly class CorrectionDraft
     public function currency(): string
     {
         return $this->positions[0]->totalGross->currency;
+    }
+
+    public function totalGross(): Money
+    {
+        $total = new Money(
+            0,
+            $this->positions[0]->totalGross->currency,
+            $this->positions[0]->totalGross->fractionDigits,
+        );
+
+        foreach ($this->positions as $position) {
+            $total = $total->plus($position->totalGross);
+        }
+
+        return $total;
     }
 
     private static function validText(string $value, int $maximumLength): bool

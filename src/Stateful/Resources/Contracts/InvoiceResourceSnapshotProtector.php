@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Cieplik206\Fakturownia\Stateful\Resources\Contracts;
 
-use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceResult;
 use Cieplik206\Fakturownia\Stateful\Resources\InvoiceResourceId;
 use Cieplik206\Fakturownia\Stateful\Resources\InvoiceResourceProjectionPlan;
 use Cieplik206\Fakturownia\Stateful\Resources\ProtectedInvoiceResourceSnapshot;
@@ -20,5 +19,5 @@ interface InvoiceResourceSnapshotProtector
         ConnectionKey $connectionKey,
         OperationId $operationId,
         ProtectedInvoiceResourceSnapshot $snapshot,
-    ): IssueInvoiceResult;
+    ): InvoiceResourceSnapshot;
 }

@@ -58,8 +58,8 @@ final readonly class DatabaseInvoiceResourceStore implements InvoiceResourceProj
             'local_type' => $plan->localReferenceType,
             'local_hmac_key_version' => $plan->localReferenceHmac->keyVersion,
             'local_reference_hmac' => $plan->localReferenceHmac->hex,
-            'remote_id' => $plan->snapshot->remoteId,
-            'remote_number' => $plan->snapshot->number,
+            'remote_id' => $plan->snapshot->remoteId(),
+            'remote_number' => $plan->snapshot->remoteNumber(),
             'created_by_operation_id' => $plan->operationId->value,
             'last_operation_id' => $plan->operationId->value,
             'snapshot_schema_version' => $protected->snapshotSchemaVersion,
@@ -177,7 +177,7 @@ final readonly class DatabaseInvoiceResourceStore implements InvoiceResourceProj
         $rows = $this->resourceQuery($connection, $plan->connectionKey)
             ->where(function (Builder $query) use ($plan): void {
                 $query->where('id', $plan->resourceId->value)
-                    ->orWhere('remote_id', $plan->snapshot->remoteId)
+                    ->orWhere('remote_id', $plan->snapshot->remoteId())
                     ->orWhere(function (Builder $local) use ($plan): void {
                         $local->where('local_type', $plan->localReferenceType)
                             ->where('local_hmac_key_version', $plan->localReferenceHmac->keyVersion)

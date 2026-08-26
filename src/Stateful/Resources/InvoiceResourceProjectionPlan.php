@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Cieplik206\Fakturownia\Stateful\Resources;
 
-use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceResult;
-use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceResultCodec;
+use Cieplik206\Fakturownia\Stateful\Resources\Contracts\InvoiceResourceSnapshot;
 use Cieplik206\Fakturownia\Stateful\Resources\Exceptions\InvoiceResourceProjectionConflict;
 use Cieplik206\Fakturownia\Stateful\Support\RejectsNativeSerialization;
 use Cieplik206\IntegrationOperations\Enums\LookupHmacDomain;
@@ -30,11 +29,11 @@ final readonly class InvoiceResourceProjectionPlan
         public OperationId $operationId,
         public string $localReferenceType,
         public VersionedHmacDigest $localReferenceHmac,
-        public IssueInvoiceResult $snapshot,
+        public InvoiceResourceSnapshot $snapshot,
         public VersionedHmacDigest $snapshotFingerprint,
     ) {
         if (! $resourceId->equals(InvoiceResourceId::fromOperationId($operationId))
-            || $localReferenceType !== InvoiceResource::LocalReferenceType
+            || ! in_array($localReferenceType, InvoiceResource::localReferenceTypes(), true)
             || $localReferenceHmac->domain !== LookupHmacDomain::Intent
             || $snapshotFingerprint->domain !== LookupHmacDomain::Payload) {
             throw new InvalidArgumentException('Invoice resource projection plan is inconsistent.');
@@ -47,15 +46,16 @@ final readonly class InvoiceResourceProjectionPlan
             || $resource->localReferenceHmac->equals($this->localReferenceHmac);
         $sameSnapshotFingerprint = $resource->snapshotFingerprint->keyVersion !== $this->snapshotFingerprint->keyVersion
             || $resource->snapshotFingerprint->equals($this->snapshotFingerprint);
-        $sameSnapshot = (new IssueInvoiceResultCodec)->encode($resource->snapshot)
-            ->equals((new IssueInvoiceResultCodec)->encode($this->snapshot));
+        $codec = new InvoiceResourceSnapshotCodec;
+        $sameSnapshot = $codec->encode($resource->snapshot)
+            ->equals($codec->encode($this->snapshot));
 
         if (! $resource->id->equals($this->resourceId)
             || ! $resource->connectionKey->equals($this->connectionKey)
             || $resource->localReferenceType !== $this->localReferenceType
             || ! $sameLocalDigest
-            || ! hash_equals($resource->remoteId, $this->snapshot->remoteId)
-            || ! hash_equals($resource->remoteNumber, $this->snapshot->number)
+            || ! hash_equals($resource->remoteId, $this->snapshot->remoteId())
+            || ! hash_equals($resource->remoteNumber, $this->snapshot->remoteNumber())
             || ! $resource->createdByOperationId->equals($this->operationId)
             || ! $resource->lastOperationId->equals($this->operationId)
             || ! $sameSnapshotFingerprint

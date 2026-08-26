@@ -24,12 +24,12 @@ use Cieplik206\IntegrationOperations\ValueObjects\ReconciliationOutcome;
 
 it('round trips a strict correction command with negative money and before after snapshots', function (): void {
     $codec = new IssueCorrectionPayloadCodec;
-    $command = new IssueCorrectionCommand(CorrectionFixtures::draft());
+    $command = new IssueCorrectionCommand(CorrectionFixtures::draft(), CorrectionFixtures::identity());
     $encoded = $codec->encode($command);
     $decoded = $codec->decode($encoded);
     $line = $decoded->draft->positions[0];
 
-    expect(IssueCorrectionPayloadCodec::schemaVersion())->toBe(1)
+    expect(IssueCorrectionPayloadCodec::schemaVersion())->toBe(2)
         ->and($codec->writeActivationSlot($encoded))->toBe('invoice.correction.issue')
         ->and(s71CorrectionPayloadJson($codec->canonicalize($encoded)))
         ->toBe(s71CorrectionPayloadJson($encoded))
@@ -47,8 +47,8 @@ it('round trips a strict correction command with negative money and before after
 
 it('rejects native serialization and keeps the exact provider request credentialless', function (): void {
     $draft = CorrectionFixtures::draft();
-    $command = new IssueCorrectionCommand($draft);
-    $request = IssueCorrectionRequestPayload::fromDraft($draft);
+    $command = new IssueCorrectionCommand($draft, CorrectionFixtures::identity());
+    $request = IssueCorrectionRequestPayload::fromDraft($draft, CorrectionFixtures::identity());
     $body = $request->bodyWithoutCredentials();
 
     expect(fn (): string => serialize($draft))->toThrow(LogicException::class)
@@ -63,10 +63,13 @@ it('rejects native serialization and keeps the exact provider request credential
 
 it('rejects schema slot keys scalar and before after tampering', function (): void {
     $codec = new IssueCorrectionPayloadCodec;
-    $payload = $codec->encode(new IssueCorrectionCommand(CorrectionFixtures::draft()))->values;
+    $payload = $codec->encode(new IssueCorrectionCommand(
+        CorrectionFixtures::draft(),
+        CorrectionFixtures::identity(),
+    ))->values;
 
     $wrongSchema = $payload;
-    $wrongSchema['schema_version'] = 2;
+    $wrongSchema['schema_version'] = 1;
 
     $wrongSlot = $payload;
     $wrongSlot['write_activation_slot'] = 'invoice.issue';
@@ -132,9 +135,12 @@ it('bounds correction position count and both canonical and provider payloads', 
     ));
 
     expect(fn (): CanonicalObject => (new IssueCorrectionPayloadCodec)->encode(
-        new IssueCorrectionCommand($largeDraft),
+        new IssueCorrectionCommand($largeDraft, CorrectionFixtures::identity()),
     ))->toThrow(InvalidArgumentException::class)
-        ->and(fn (): IssueCorrectionRequestPayload => IssueCorrectionRequestPayload::fromDraft($largeDraft))
+        ->and(fn (): IssueCorrectionRequestPayload => IssueCorrectionRequestPayload::fromDraft(
+            $largeDraft,
+            CorrectionFixtures::identity(),
+        ))
         ->toThrow(InvalidArgumentException::class);
 });
 
@@ -296,12 +302,10 @@ function s71CorrectionPayloadAtBytes(int $targetBytes): CanonicalObject
     $reason = 'R';
     $clientId = 'C';
     $sourceInvoiceId = 'S';
-    $base = $codec->encode(new IssueCorrectionCommand(s71CorrectionBoundaryDraft(
-        $positions,
-        $reason,
-        $clientId,
-        $sourceInvoiceId,
-    )));
+    $base = $codec->encode(new IssueCorrectionCommand(
+        s71CorrectionBoundaryDraft($positions, $reason, $clientId, $sourceInvoiceId),
+        CorrectionFixtures::identity(),
+    ));
     $remainingBytes = $targetBytes - strlen(s71CorrectionPayloadJson($base));
 
     foreach ($positions as $index => $_line) {
@@ -338,12 +342,10 @@ function s71CorrectionPayloadAtBytes(int $targetBytes): CanonicalObject
     $remainingBytes -= $clientIdBytes;
     $sourceInvoiceId .= str_repeat('s', $remainingBytes);
 
-    return $codec->encode(new IssueCorrectionCommand(s71CorrectionBoundaryDraft(
-        $positions,
-        $reason,
-        $clientId,
-        $sourceInvoiceId,
-    )));
+    return $codec->encode(new IssueCorrectionCommand(
+        s71CorrectionBoundaryDraft($positions, $reason, $clientId, $sourceInvoiceId),
+        CorrectionFixtures::identity(),
+    ));
 }
 
 /** @param non-empty-list<CorrectionLine> $positions */

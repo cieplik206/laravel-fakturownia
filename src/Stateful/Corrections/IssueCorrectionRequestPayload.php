@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Cieplik206\Fakturownia\Stateful\Corrections;
 
+use Cieplik206\Fakturownia\Stateful\Invoices\Identity\RemoteInvoiceIdentity;
 use Cieplik206\Fakturownia\Stateful\Support\RejectsNativeSerialization;
 use Cieplik206\IntegrationOperations\Crypto\CanonicalJsonV1;
 use Cieplik206\IntegrationOperations\Crypto\CanonicalObject;
@@ -30,9 +31,16 @@ final readonly class IssueCorrectionRequestPayload
         }
     }
 
-    public static function fromDraft(CorrectionDraft $draft): self
-    {
-        return new self([
+    public static function fromDraft(
+        CorrectionDraft $draft,
+        RemoteInvoiceIdentity $identity,
+    ): self {
+        if ($identity->scope->documentKind !== 'correction'
+            || $identity->scope->departmentId !== (string) $draft->departmentId) {
+            throw new InvalidArgumentException('Correction request identity does not match the draft scope.');
+        }
+
+        $invoice = [
             'kind' => 'correction',
             'correction_reason' => $draft->reason,
             'invoice_id' => $draft->sourceInvoiceId,
@@ -57,7 +65,17 @@ final readonly class IssueCorrectionRequestPayload
                 static fn (CorrectionLine $line): array => self::mapLine($line),
                 $draft->positions,
             ),
-        ]);
+        ];
+
+        if ($identity->oid() !== null) {
+            $invoice['oid'] = $identity->oid();
+        }
+
+        if ($identity->usesOidUnique()) {
+            $invoice['oid_unique'] = 'yes';
+        }
+
+        return new self($invoice);
     }
 
     /** @return array{placement: string, field: string} */

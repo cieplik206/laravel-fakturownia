@@ -9,11 +9,31 @@ use Cieplik206\Fakturownia\Stateful\Corrections\CorrectionLine;
 use Cieplik206\Fakturownia\Stateful\Corrections\CorrectionLineMode;
 use Cieplik206\Fakturownia\Stateful\Corrections\CorrectionPositionAttributes;
 use Cieplik206\Fakturownia\Stateful\Corrections\CorrectionPositionKind;
+use Cieplik206\Fakturownia\Stateful\Invoices\Identity\OidUniquenessGate;
+use Cieplik206\Fakturownia\Stateful\Invoices\Identity\RemoteIdentityScope;
+use Cieplik206\Fakturownia\Stateful\Invoices\Identity\RemoteInvoiceIdentity;
 use Cieplik206\Fakturownia\Stateful\Invoices\InvoiceBuyer;
 use Cieplik206\Fakturownia\Stateful\Invoices\Money;
+use Cieplik206\IntegrationOperations\ValueObjects\ConnectionKey;
 
 final class CorrectionFixtures
 {
+    public static function identity(
+        int $departmentId = 839_841,
+        string $localReference = 'return:123',
+    ): RemoteInvoiceIdentity {
+        return RemoteInvoiceIdentity::technicalOidWithTransactionOrder(
+            new RemoteIdentityScope(
+                new ConnectionKey('primary'),
+                'correction',
+                (string) $departmentId,
+            ),
+            '0198ea14-e955-7ac1-b0c5-2b9397a90e51',
+            $localReference,
+            OidUniquenessGate::notPassed(),
+        );
+    }
+
     public static function buyer(): InvoiceBuyer
     {
         return new InvoiceBuyer(

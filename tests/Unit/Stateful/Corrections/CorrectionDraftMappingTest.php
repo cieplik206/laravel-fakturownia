@@ -10,8 +10,22 @@ use Cieplik206\Fakturownia\Stateful\Corrections\CorrectionPositionKind;
 use Cieplik206\Fakturownia\Stateful\Corrections\IssueCorrectionPayloadMapper;
 use Cieplik206\Fakturownia\Stateful\Corrections\IssueCorrectionRequestPayload;
 use Cieplik206\Fakturownia\Stateful\Corrections\IssueCorrectionResponseMapper;
+use Cieplik206\Fakturownia\Stateful\Invoices\Identity\OidUniquenessGate;
+use Cieplik206\Fakturownia\Stateful\Invoices\Identity\RemoteIdentityScope;
+use Cieplik206\Fakturownia\Stateful\Invoices\Identity\RemoteInvoiceIdentity;
 use Cieplik206\Fakturownia\Stateful\Invoices\InvoiceBuyer;
 use Cieplik206\Fakturownia\Stateful\Invoices\Money;
+use Cieplik206\IntegrationOperations\ValueObjects\ConnectionKey;
+
+function correctionIdentity(int $departmentId): RemoteInvoiceIdentity
+{
+    return RemoteInvoiceIdentity::technicalOidWithTransactionOrder(
+        new RemoteIdentityScope(new ConnectionKey('primary'), 'correction', (string) $departmentId),
+        '0198ea14-e955-7ac1-b0c5-2b9397a90e51',
+        'return:123',
+        OidUniquenessGate::notPassed(),
+    );
+}
 
 function correctionBuyer(): InvoiceBuyer
 {
@@ -77,7 +91,7 @@ it('maps a correction draft with explicit negative deltas and before-after snaps
         '2026-08-25',
         'client-77',
     );
-    $request = (new IssueCorrectionPayloadMapper)->map($draft);
+    $request = (new IssueCorrectionPayloadMapper)->map($draft, correctionIdentity(839_841));
     $body = $request->bodyWithoutCredentials();
     $invoice = $body['invoice'];
     $position = $invoice['positions'][0];
@@ -255,7 +269,7 @@ it('supports value-only corrections with unchanged quantity', function (): void 
         'Częściowy zwrot wartości',
         correctionBuyer(),
         [$line],
-    ))->bodyWithoutCredentials();
+    ), correctionIdentity(1))->bodyWithoutCredentials();
 
     expect($line->mode)->toBe(CorrectionLineMode::Value)
         ->and($payload['invoice']['positions'][0]['quantity'])->toBe('0.00')
@@ -298,7 +312,7 @@ it('preserves unchanged source lines only beside an effective correction', funct
         correctionBuyer(),
         [$preserved, correctionLine()],
     );
-    $positions = (new IssueCorrectionPayloadMapper)->map($draft)
+    $positions = (new IssueCorrectionPayloadMapper)->map($draft, correctionIdentity(1))
         ->bodyWithoutCredentials()['invoice']['positions'];
 
     expect($draft->positions[0]->mode)->toBe(CorrectionLineMode::Preserved)
@@ -469,7 +483,7 @@ it('never accepts credentials inside the request DTO', function (): void {
         'Zwrot',
         correctionBuyer(),
         [correctionLine()],
-    ));
+    ), correctionIdentity(1));
 
     expect($constructor->isPrivate())->toBeTrue()
         ->and(json_encode($request->bodyWithoutCredentials(), JSON_THROW_ON_ERROR))
