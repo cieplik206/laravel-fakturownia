@@ -28,7 +28,10 @@ final class PreAutoloadLauncher
 
     private const ManifestContract = 'cieplik206.fakturownia.preauthenticated-snapshot';
 
-    private const Version = 1;
+    private const Version = 2;
+
+    /** @var list<string> */
+    private const RequiredExtensionNames = ['posix', 'sodium'];
 
     private const MaximumPolicyBytes = 65_536;
 
@@ -226,6 +229,7 @@ final class PreAutoloadLauncher
             'public_key_sha256',
             'php_executable',
             'php_executable_sha256',
+            'php_extensions',
             'launcher_sha256',
             'probe_entrypoint',
             'limits',
@@ -241,6 +245,7 @@ final class PreAutoloadLauncher
 
         self::assertSha256Value($policy['public_key_sha256'], 'policy.public_key_sha256');
         self::assertSha256Value($policy['php_executable_sha256'], 'policy.php_executable_sha256');
+        self::assertPhpExtensionsPolicy($policy['php_extensions']);
         self::assertSha256Value($policy['launcher_sha256'], 'policy.launcher_sha256');
         self::assertCanonicalRelativePathValue($policy['probe_entrypoint'], 'policy.probe_entrypoint', self::MaximumPathBytes);
 
@@ -265,6 +270,14 @@ final class PreAutoloadLauncher
         }
 
         self::assertProtectedRuntimeFile($policy['php_executable'], $policy['php_executable_sha256']);
+
+        foreach (self::RequiredExtensionNames as $extensionName) {
+            $extension = $policy['php_extensions'][$extensionName];
+
+            if (\is_string($extension['path']) && \is_string($extension['sha256'])) {
+                self::assertProtectedRuntimeFile($extension['path'], $extension['sha256']);
+            }
+        }
 
         $launcher = self::hashOpenedFile(__FILE__, self::MaximumFileBytes, false);
 
@@ -308,6 +321,38 @@ final class PreAutoloadLauncher
         self::assertBoundedPositiveInteger($limits['authorization_bytes'], self::MaximumSecretBytes, 'authorization_bytes');
     }
 
+    private static function assertPhpExtensionsPolicy(mixed $extensions): void
+    {
+        if (! \is_array($extensions)) {
+            throw new RuntimeException('policy.php_extensions must be an object');
+        }
+
+        self::assertExactKeys($extensions, self::RequiredExtensionNames, 'policy.php_extensions');
+
+        foreach (self::RequiredExtensionNames as $extensionName) {
+            $extension = $extensions[$extensionName];
+
+            if (! \is_array($extension)) {
+                throw new RuntimeException("policy.php_extensions.{$extensionName} must be an object");
+            }
+
+            self::assertExactKeys($extension, ['path', 'sha256'], "policy.php_extensions.{$extensionName}");
+
+            if ($extension['path'] === null && $extension['sha256'] === null) {
+                continue;
+            }
+
+            self::assertCanonicalAbsolutePolicyPath(
+                $extension['path'],
+                "policy.php_extensions.{$extensionName}.path",
+            );
+            self::assertSha256Value(
+                $extension['sha256'],
+                "policy.php_extensions.{$extensionName}.sha256",
+            );
+        }
+    }
+
     /** @param array<string, mixed> $policy */
     private static function assertCurrentRuntimeMatchesPolicy(array $policy): void
     {
@@ -318,6 +363,20 @@ final class PreAutoloadLauncher
         }
 
         self::assertProtectedRuntimeFile($phpBinary, $policy['php_executable_sha256']);
+
+        foreach (self::RequiredExtensionNames as $extensionName) {
+            if (! \extension_loaded($extensionName)) {
+                throw new RuntimeException("the required {$extensionName} extension is not loaded");
+            }
+
+            $configured = $policy['php_extensions'][$extensionName];
+
+            if ($configured['path'] === null) {
+                continue;
+            }
+
+            self::assertProtectedRuntimeFile($configured['path'], $configured['sha256']);
+        }
     }
 
     /**
@@ -501,8 +560,10 @@ final class PreAutoloadLauncher
             'zend_extensions',
         ], 'manifest.runtime');
 
-        if (! \is_array($runtime['arguments']) || $runtime['arguments'] !== ['-n']) {
-            throw new RuntimeException('manifest.runtime.arguments must be exactly [-n]');
+        $runtimeArguments = self::runtimeArguments($policy);
+
+        if (! \is_array($runtime['arguments']) || $runtime['arguments'] !== $runtimeArguments) {
+            throw new RuntimeException('manifest.runtime.arguments do not match the pinned no-ini runtime');
         }
 
         if (! \is_array($runtime['ini'])) {
@@ -529,7 +590,7 @@ final class PreAutoloadLauncher
             'php_version' => \PHP_VERSION,
             'php_version_id' => \PHP_VERSION_ID,
             'sapi' => 'cli',
-            'arguments' => ['-n'],
+            'arguments' => $runtimeArguments,
             'ini' => $expectedIni,
             'extensions' => self::loadedExtensions(false),
             'zend_extensions' => self::loadedExtensions(true),
@@ -1005,11 +1066,7 @@ final class PreAutoloadLauncher
             'FAKTUROWNIA_CREDENTIAL_FD' => '3',
             'FAKTUROWNIA_AUTHORIZATION_FD' => '4',
         ];
-        $command = [
-            $policy['php_executable'],
-            '-n',
-            $verified['entrypoint'],
-        ];
+        $command = [$policy['php_executable'], ...self::runtimeArguments($policy), $verified['entrypoint']];
         $pipes = [];
 
         try {
@@ -1075,8 +1132,29 @@ final class PreAutoloadLauncher
         $hashed = self::hashOpenedFile($path, self::MaximumFileBytes, false);
 
         if (! \hash_equals($sha256, $hashed['sha256'])) {
-            throw new RuntimeException('the PHP executable hash does not match policy');
+            throw new RuntimeException('a protected runtime file hash does not match policy');
         }
+    }
+
+    /** @param array<string, mixed> $policy
+     * @return list<string>
+     */
+    private static function runtimeArguments(array $policy): array
+    {
+        $arguments = ['-n'];
+
+        foreach (self::RequiredExtensionNames as $extensionName) {
+            $extension = $policy['php_extensions'][$extensionName];
+
+            if (! \is_string($extension['path'])) {
+                continue;
+            }
+
+            $arguments[] = '-d';
+            $arguments[] = "extension={$extension['path']}";
+        }
+
+        return $arguments;
     }
 
     private static function assertRuntimeAncestors(string $path, bool $required): void

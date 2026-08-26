@@ -28,13 +28,20 @@ The policy is strict JSON with no duplicate or additional keys:
 ```json
 {
   "contract": "cieplik206.fakturownia.preauthenticated-policy",
-  "version": 1,
+  "version": 2,
   "manifest_root": "/var/lib/cieplik206/fakturownia-live-evidence/manifests",
   "snapshot_root": "/var/lib/cieplik206/fakturownia-live-evidence/snapshots",
   "public_key_path": "/etc/cieplik206/fakturownia-live-evidence/operator-ed25519.pub",
   "public_key_sha256": "<64 lowercase hex>",
   "php_executable": "/usr/bin/php8.4",
   "php_executable_sha256": "<64 lowercase hex>",
+  "php_extensions": {
+    "posix": {"path": null, "sha256": null},
+    "sodium": {
+      "path": "/usr/lib/php/20240924/sodium.so",
+      "sha256": "<64 lowercase hex>"
+    }
+  },
   "launcher_sha256": "<64 lowercase hex>",
   "probe_entrypoint": "tests/Contract/LiveEvidenceProbeEntrypoint.php",
   "limits": {
@@ -52,7 +59,7 @@ The policy is strict JSON with no duplicate or additional keys:
 }
 ```
 
-All absolute paths must already equal `realpath()` and may not contain `.` or `..` components. Values in `limits` can be lowered but cannot exceed the launcher's compiled ceilings.
+All absolute paths must already equal `realpath()` and may not contain `.` or `..` components. Values in `limits` can be lowered but cannot exceed the launcher's compiled ceilings. Each required extension uses `null` path and hash only when it is compiled into the pinned PHP binary. A dynamically loaded POSIX or Sodium module requires its canonical path and SHA-256; the launcher validates the protected file and derives the only accepted `-d extension=...` arguments from this policy.
 
 ## Signed manifest contract
 
@@ -64,7 +71,7 @@ contract, version, repository, entrypoint, bindings, runtime, directories, files
 
 Required semantics:
 
-- `contract` is `cieplik206.fakturownia.preauthenticated-snapshot`, `version` is `1`;
+- `contract` is `cieplik206.fakturownia.preauthenticated-snapshot`, `version` is `2`;
 - `repository.commit` is the signed 40- or 64-character lowercase Git object id;
 - `entrypoint` exactly equals the path pinned by policy and is present in `bindings.harness_files`;
 - `directories` is a unique, bytewise-sorted inventory of `{path,type:"directory",mode}`;
@@ -87,7 +94,7 @@ The tree digest input is canonical JSON with recursively bytewise-sorted object 
 ```json
 {
   "contract": "cieplik206.fakturownia.snapshot-file-set",
-  "version": 1,
+  "version": 2,
   "files": ["the relevant sorted exact file records"]
 }
 ```
@@ -99,7 +106,7 @@ php_executable, php_executable_sha256, php_version, php_version_id,
 sapi, arguments, ini, extensions, zend_extensions
 ```
 
-It binds the policy-pinned executable and hash, exact PHP version/version id, `cli`, the exact argument list `["-n"]`, no loaded or scanned ini, empty `auto_prepend_file` and `auto_append_file`, and bytewise-sorted exact normal and Zend extension lists. Capture those lists with the pinned binary using `-n`; do not derive them from a Composer process that loaded an ini file.
+It binds the policy-pinned executable and hash, exact PHP version/version id, `cli`, the exact no-ini argument list derived from `php_extensions`, no loaded or scanned ini, empty `auto_prepend_file` and `auto_append_file`, and bytewise-sorted exact normal and Zend extension lists. The argument list always starts with `["-n"]`; each dynamic required module appends the exact pair `["-d", "extension=<canonical-policy-path>"]` in POSIX, Sodium order. Capture the extension lists with those exact arguments; do not derive them from a Composer process that loaded an ini file.
 
 The signer signs the raw manifest bytes with detached Ed25519. The signature file is raw 64-byte output, not base64. If `H` is the lowercase SHA-256 of those exact raw bytes, install:
 

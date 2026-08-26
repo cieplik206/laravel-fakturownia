@@ -15,7 +15,8 @@ declare(strict_types=1);
  *     result: string,
  *     source: string,
  *     source_original: string,
- *     manifest_sha256: string
+ *     manifest_sha256: string,
+ *     php_arguments: list<string>
  * }
  */
 function fakturowniaPreAutoloadFixture(?string $signedMutation = null): array
@@ -88,15 +89,18 @@ function fakturowniaPreAutoloadFixture(?string $signedMutation = null): array
         throw new RuntimeException('Cannot resolve the PHP executable.');
     }
 
+    $phpRuntime = fakturowniaPreAutoloadPhpRuntime();
+
     $policy = [
         'contract' => 'cieplik206.fakturownia.preauthenticated-policy',
-        'version' => 1,
+        'version' => 2,
         'manifest_root' => $manifestRoot,
         'snapshot_root' => $snapshotRoot,
         'public_key_path' => $publicKeyPath,
         'public_key_sha256' => \hash('sha256', $publicKey),
         'php_executable' => $phpExecutable,
         'php_executable_sha256' => \hash_file('sha256', $phpExecutable),
+        'php_extensions' => $phpRuntime['extensions'],
         'launcher_sha256' => \hash('sha256', $instrumented),
         'probe_entrypoint' => 'tests/Contract/LiveEvidenceProbeEntrypoint.php',
         'limits' => [
@@ -220,7 +224,7 @@ PHP;
 
     fakturowniaPreAutoloadMakeTreeReadOnly($staging);
     $tree = fakturowniaPreAutoloadInventory($staging);
-    $runtimeExtensions = fakturowniaPreAutoloadRuntimeExtensions($phpExecutable);
+    $runtimeExtensions = fakturowniaPreAutoloadRuntimeExtensions($phpExecutable, $phpRuntime['arguments']);
     $filesByPath = [];
 
     foreach ($tree['files'] as $file) {
@@ -252,7 +256,7 @@ PHP;
 
     $manifest = [
         'contract' => 'cieplik206.fakturownia.preauthenticated-snapshot',
-        'version' => 1,
+        'version' => 2,
         'repository' => ['commit' => \str_repeat('a', 40)],
         'entrypoint' => 'tests/Contract/LiveEvidenceProbeEntrypoint.php',
         'bindings' => [
@@ -274,7 +278,7 @@ PHP;
             'php_version' => $runtimeExtensions['php_version'],
             'php_version_id' => $runtimeExtensions['php_version_id'],
             'sapi' => 'cli',
-            'arguments' => ['-n'],
+            'arguments' => $phpRuntime['arguments'],
             'ini' => [
                 'loaded_file' => false,
                 'scanned_files' => false,
@@ -328,6 +332,7 @@ PHP;
         'source' => "{$snapshot}/src/Example.php",
         'source_original' => $sourceOriginal,
         'manifest_sha256' => $manifestSha256,
+        'php_arguments' => $phpRuntime['arguments'],
     ];
 }
 
@@ -336,7 +341,8 @@ PHP;
  *     launcher: string,
  *     credential: string,
  *     authorization: string,
- *     manifest_sha256: string
+ *     manifest_sha256: string,
+ *     php_arguments: list<string>
  * } $fixture
  * @return array{exit_code: int, stdout: string, stderr: string}
  */
@@ -344,7 +350,7 @@ function fakturowniaRunPreAutoloadLauncher(array $fixture): array
 {
     $command = [
         \PHP_BINARY,
-        '-n',
+        ...$fixture['php_arguments'],
         $fixture['launcher'],
         "--manifest-sha256={$fixture['manifest_sha256']}",
         "--credential-file={$fixture['credential']}",
@@ -382,12 +388,15 @@ function fakturowniaRunPreAutoloadLauncher(array $fixture): array
     ];
 }
 
-/** @return array{php_version: string, php_version_id: int, extensions: list<string>, zend_extensions: list<string>} */
-function fakturowniaPreAutoloadRuntimeExtensions(string $phpExecutable): array
+/**
+ * @param  list<string>  $arguments
+ * @return array{php_version: string, php_version_id: int, extensions: list<string>, zend_extensions: list<string>}
+ */
+function fakturowniaPreAutoloadRuntimeExtensions(string $phpExecutable, array $arguments): array
 {
     $command = [
         $phpExecutable,
-        '-n',
+        ...$arguments,
         '-r',
         '$extensions=get_loaded_extensions(false);sort($extensions,SORT_STRING);$zend=get_loaded_extensions(true);sort($zend,SORT_STRING);echo json_encode(["php_version"=>PHP_VERSION,"php_version_id"=>PHP_VERSION_ID,"extensions"=>$extensions,"zend_extensions"=>$zend],JSON_THROW_ON_ERROR);',
     ];
@@ -437,6 +446,52 @@ function fakturowniaPreAutoloadRuntimeExtensions(string $phpExecutable): array
         'extensions' => $extensions,
         'zend_extensions' => $zendExtensions,
     ];
+}
+
+/**
+ * @return array{
+ *     arguments: list<string>,
+ *     extensions: array{
+ *         posix: array{path: string|null, sha256: string|null},
+ *         sodium: array{path: string|null, sha256: string|null}
+ *     }
+ * }
+ */
+function fakturowniaPreAutoloadPhpRuntime(): array
+{
+    $phpExecutable = \realpath(\PHP_BINARY);
+
+    if (! \is_string($phpExecutable)) {
+        throw new RuntimeException('Cannot resolve the PHP executable for extension discovery.');
+    }
+
+    $arguments = ['-n'];
+    $extensions = [];
+    $builtIn = fakturowniaPreAutoloadRuntimeExtensions($phpExecutable, $arguments)['extensions'];
+    $extensionDirectory = \realpath((string) \ini_get('extension_dir'));
+
+    foreach (['posix', 'sodium'] as $extensionName) {
+        if (\in_array($extensionName, $builtIn, true)) {
+            $extensions[$extensionName] = ['path' => null, 'sha256' => null];
+
+            continue;
+        }
+
+        $resolvedPath = \is_string($extensionDirectory)
+            ? \realpath($extensionDirectory.'/'.$extensionName.'.'.\PHP_SHLIB_SUFFIX)
+            : false;
+        $sha256 = \is_string($resolvedPath) ? \hash_file('sha256', $resolvedPath) : false;
+
+        if (! \is_string($resolvedPath) || ! \is_string($sha256)) {
+            throw new RuntimeException("Cannot pin the {$extensionName} extension runtime file.");
+        }
+
+        $extensions[$extensionName] = ['path' => $resolvedPath, 'sha256' => $sha256];
+        $arguments[] = '-d';
+        $arguments[] = "extension={$resolvedPath}";
+    }
+
+    return ['arguments' => $arguments, 'extensions' => $extensions];
 }
 
 /**
@@ -532,7 +587,7 @@ function fakturowniaPreAutoloadRecordsSha256(array $records): string
 {
     return \hash('sha256', fakturowniaPreAutoloadCanonicalJson([
         'contract' => 'cieplik206.fakturownia.snapshot-file-set',
-        'version' => 1,
+        'version' => 2,
         'files' => $records,
     ]));
 }
@@ -636,13 +691,14 @@ function fakturowniaPreAutoloadRemoveTree(string $root): void
 
 it('fails closed before parsing caller input when the native root supervisor is not deployed', function (): void {
     $launcher = \dirname(__DIR__, 2).'/bin/fakturownia-live-evidence-launcher.php';
+    $phpRuntime = fakturowniaPreAutoloadPhpRuntime();
     $sentinel = \realpath(\sys_get_temp_dir()).'/fakturownia-forbidden-prepend-'.\bin2hex(\random_bytes(12)).'.php';
     \file_put_contents($sentinel, "<?php file_put_contents(__FILE__.'.executed', 'yes');");
     $pipes = [];
     $process = \proc_open(
         [
             \PHP_BINARY,
-            '-n',
+            ...$phpRuntime['arguments'],
             $launcher,
             '-d',
             "extension={$sentinel}",

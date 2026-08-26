@@ -2580,15 +2580,19 @@ final class LiveEvidenceAttestationGuard
     {
         $resolved = realpath($path);
         $metadata = $resolved === false ? false : lstat($resolved);
+        $directory = realpath(dirname($path));
+        $directoryMetadata = $directory === false ? false : lstat($directory);
 
         if ($resolved === false
-            || $resolved !== $path
-            || is_link($path)
             || ! is_file($resolved)
             || ! is_executable($resolved)
             || $metadata === false
             || $metadata['uid'] !== 0
-            || ($metadata['mode'] & 0022) !== 0) {
+            || ($metadata['mode'] & 0022) !== 0
+            || $directory === false
+            || $directoryMetadata === false
+            || $directoryMetadata['uid'] !== 0
+            || ($directoryMetadata['mode'] & 0022) !== 0) {
             throw new RuntimeException('A security-critical executable cannot be integrity-pinned.');
         }
 

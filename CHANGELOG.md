@@ -7,6 +7,16 @@ Versioning.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-08-26
+
+### Fixed
+
+- Accept canonical root-owned executable targets behind protected merged-`/usr`
+  directory aliases without weakening executable integrity checks.
+- Pin dynamically loaded POSIX and Sodium module paths, hashes, and no-ini PHP
+  arguments in pre-autoload policy/manifest contract v2, keeping local and CI
+  runtimes equally fail-closed.
+
 ## [0.1.1] - 2026-08-26
 
 ### Fixed

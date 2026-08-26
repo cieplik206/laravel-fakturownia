@@ -28,10 +28,10 @@
         "signed_sidecar_suffix": ".attestation.json",
         "preautoload_trust_root": {
             "launcher_source_path": "bin/fakturownia-live-evidence-launcher.php",
-            "launcher_source_sha256": "e0fe53eb581157b73c9fdf588631e1a2a7486a05305312da45157fd52dbe0951",
+            "launcher_source_sha256": "57594c7180eec5de8002030826f63828a70941ea8f6e844e6b888654770a536b",
             "policy_contract": "cieplik206.fakturownia.preauthenticated-policy",
             "manifest_contract": "cieplik206.fakturownia.preauthenticated-snapshot",
-            "version": 1,
+            "version": 2,
             "production_launcher_path": "/usr/local/libexec/cieplik206/fakturownia-live-evidence-launcher.php",
             "policy_path": "/etc/cieplik206/fakturownia-live-evidence/preautoload-policy.json",
             "snapshot_root": "/var/lib/cieplik206/fakturownia-live-evidence/snapshots",
