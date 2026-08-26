@@ -96,7 +96,7 @@ function fakturowniaPreAutoloadFixture(?string $signedMutation = null): array
         throw new RuntimeException('Cannot create the trusted PHP runtime fixture.');
     }
 
-    $phpRuntime = fakturowniaPreAutoloadPhpRuntime();
+    $phpRuntime = fakturowniaPreAutoloadPhpRuntime($base);
 
     $policy = [
         'contract' => 'cieplik206.fakturownia.preauthenticated-policy',
@@ -466,7 +466,7 @@ function fakturowniaPreAutoloadRuntimeExtensions(string $phpExecutable, array $a
  *     }
  * }
  */
-function fakturowniaPreAutoloadPhpRuntime(): array
+function fakturowniaPreAutoloadPhpRuntime(?string $trustedRuntimeRoot = null): array
 {
     $phpExecutable = \realpath(\PHP_BINARY);
 
@@ -489,15 +489,32 @@ function fakturowniaPreAutoloadPhpRuntime(): array
         $resolvedPath = \is_string($extensionDirectory)
             ? \realpath($extensionDirectory.'/'.$extensionName.'.'.\PHP_SHLIB_SUFFIX)
             : false;
-        $sha256 = \is_string($resolvedPath) ? \hash_file('sha256', $resolvedPath) : false;
-
-        if (! \is_string($resolvedPath) || ! \is_string($sha256)) {
+        if (! \is_string($resolvedPath)) {
             throw new RuntimeException("Cannot pin the {$extensionName} extension runtime file.");
         }
 
-        $extensions[$extensionName] = ['path' => $resolvedPath, 'sha256' => $sha256];
+        $trustedPath = $resolvedPath;
+
+        if ($trustedRuntimeRoot !== null) {
+            $trustedExtensionDirectory = "{$trustedRuntimeRoot}/php-extensions";
+            $trustedPath = "{$trustedExtensionDirectory}/{$extensionName}.".\PHP_SHLIB_SUFFIX;
+
+            if ((! \is_dir($trustedExtensionDirectory) && ! \mkdir($trustedExtensionDirectory, 0o700, true))
+                || ! \copy($resolvedPath, $trustedPath)
+                || ! \chmod($trustedPath, 0o555)) {
+                throw new RuntimeException("Cannot create the trusted {$extensionName} extension fixture.");
+            }
+        }
+
+        $sha256 = \hash_file('sha256', $trustedPath);
+
+        if (! \is_string($sha256)) {
+            throw new RuntimeException("Cannot hash the {$extensionName} extension runtime file.");
+        }
+
+        $extensions[$extensionName] = ['path' => $trustedPath, 'sha256' => $sha256];
         $arguments[] = '-d';
-        $arguments[] = "extension={$resolvedPath}";
+        $arguments[] = "extension={$trustedPath}";
     }
 
     return ['arguments' => $arguments, 'extensions' => $extensions];
