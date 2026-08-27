@@ -4,22 +4,104 @@ declare(strict_types=1);
 
 use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\BrokeredEffectDisposition;
 use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\BrokeredEffectExecutionResult;
+use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\BrokeredEffectExecutionResultVerifier;
 use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\CanonicalCodec;
+use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\NativeBrokerTrustPolicy;
 use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\NativeBrokerWireFrame;
 use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\NativeSupervisorAttestation;
+use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\NativeSupervisorAttestationVerifier;
 
-/** @return array{document: array<string, mixed>, public_key: non-empty-string} */
-function fakturowniaNativeSupervisorAttestationFixture(): array
+/**
+ * @return array{
+ *     document: array<string, mixed>,
+ *     public_key: non-empty-string,
+ *     policy_secret_key: non-empty-string,
+ *     supervisor_secret_key: non-empty-string,
+ *     supervisor_public_key: non-empty-string,
+ *     effect_result_secret_key: non-empty-string,
+ *     effect_result_public_key: non-empty-string
+ * }
+ */
+function fakturowniaNativeBrokerTrustPolicyFixture(): array
 {
-    $keyPair = sodium_crypto_sign_keypair();
-    $secretKey = sodium_crypto_sign_secretkey($keyPair);
-    $publicKey = sodium_crypto_sign_publickey($keyPair);
+    $policyKeyPair = sodium_crypto_sign_keypair();
+    $supervisorKeyPair = sodium_crypto_sign_keypair();
+    $effectResultKeyPair = sodium_crypto_sign_keypair();
+    $policySecretKey = sodium_crypto_sign_secretkey($policyKeyPair);
+    $policyPublicKey = sodium_crypto_sign_publickey($policyKeyPair);
+    $supervisorSecretKey = sodium_crypto_sign_secretkey($supervisorKeyPair);
+    $supervisorPublicKey = sodium_crypto_sign_publickey($supervisorKeyPair);
+    $effectResultSecretKey = sodium_crypto_sign_secretkey($effectResultKeyPair);
+    $effectResultPublicKey = sodium_crypto_sign_publickey($effectResultKeyPair);
+
+    $envelope = [
+        'contract' => NativeBrokerTrustPolicy::Contract,
+        'version' => NativeBrokerTrustPolicy::Version,
+        'algorithm' => NativeBrokerTrustPolicy::Algorithm,
+        'signer_id' => 'deployment-policy-1',
+        'issued_at' => '2026-08-27T07:50:00.000000Z',
+        'expires_at' => '2026-08-27T09:00:00.000000Z',
+        'broker_policy_sha256' => str_repeat('3', 64),
+        'supervisor_semantics_sha256' => str_repeat('4', 64),
+        'argv_sha256' => str_repeat('5', 64),
+        'environment_sha256' => str_repeat('6', 64),
+        'probe_uid' => 991,
+        'probe_gid' => 991,
+        'supervisor_signer' => [
+            'id' => 'native-supervisor-1',
+            'algorithm' => NativeBrokerTrustPolicy::Algorithm,
+            'public_key' => base64_encode($supervisorPublicKey),
+        ],
+        'effect_result_signer' => [
+            'id' => 'native-effect-result-1',
+            'algorithm' => NativeBrokerTrustPolicy::Algorithm,
+            'public_key' => base64_encode($effectResultPublicKey),
+        ],
+    ];
+
+    return [
+        'document' => fakturowniaSignNativeBrokerDocument($envelope, $policySecretKey),
+        'public_key' => base64_encode($policyPublicKey),
+        'policy_secret_key' => $policySecretKey,
+        'supervisor_secret_key' => $supervisorSecretKey,
+        'supervisor_public_key' => $supervisorPublicKey,
+        'effect_result_secret_key' => $effectResultSecretKey,
+        'effect_result_public_key' => $effectResultPublicKey,
+    ];
+}
+
+/**
+ * @param  array<string, mixed>  $envelope
+ * @param  non-empty-string  $secretKey
+ * @return array{envelope: array<string, mixed>, signature: string}
+ */
+function fakturowniaSignNativeBrokerDocument(array $envelope, string $secretKey): array
+{
+    return [
+        'envelope' => $envelope,
+        'signature' => base64_encode(sodium_crypto_sign_detached(CanonicalCodec::encode($envelope), $secretKey)),
+    ];
+}
+
+/**
+ * @param  non-empty-string|null  $secretKey
+ * @return array{document: array<string, mixed>, public_key: non-empty-string}
+ */
+function fakturowniaNativeSupervisorAttestationFixture(
+    ?string $secretKey = null,
+    string $signerId = 'native-supervisor-1',
+): array {
+    $keyPair = $secretKey === null ? sodium_crypto_sign_keypair() : null;
+    $secretKey ??= sodium_crypto_sign_secretkey($keyPair);
+    $publicKey = $keyPair === null
+        ? sodium_crypto_sign_publickey_from_secretkey($secretKey)
+        : sodium_crypto_sign_publickey($keyPair);
 
     $envelope = [
         'contract' => NativeSupervisorAttestation::Contract,
         'version' => NativeSupervisorAttestation::Version,
         'algorithm' => NativeSupervisorAttestation::Algorithm,
-        'signer_id' => 'native-broker-1',
+        'signer_id' => $signerId,
         'issued_at' => '2026-08-27T08:00:00.000000Z',
         'expires_at' => '2026-08-27T08:10:00.000000Z',
         'launch_manifest_sha256' => str_repeat('1', 64),
@@ -34,21 +116,26 @@ function fakturowniaNativeSupervisorAttestationFixture(): array
     ];
 
     return [
-        'document' => [
-            'envelope' => $envelope,
-            'signature' => base64_encode(sodium_crypto_sign_detached(CanonicalCodec::encode($envelope), $secretKey)),
-        ],
+        'document' => fakturowniaSignNativeBrokerDocument($envelope, $secretKey),
         'public_key' => $publicKey,
     ];
 }
 
-/** @return array{document: array<string, mixed>, public_key: non-empty-string} */
+/**
+ * @param  non-empty-string|null  $secretKey
+ * @return array{document: array<string, mixed>, public_key: non-empty-string}
+ */
 function fakturowniaBrokeredEffectResultFixture(
     BrokeredEffectDisposition $disposition = BrokeredEffectDisposition::Applied,
+    ?string $secretKey = null,
+    string $signerId = 'native-effect-result-1',
+    ?string $supervisorAttestationSha256 = null,
 ): array {
-    $keyPair = sodium_crypto_sign_keypair();
-    $secretKey = sodium_crypto_sign_secretkey($keyPair);
-    $publicKey = sodium_crypto_sign_publickey($keyPair);
+    $keyPair = $secretKey === null ? sodium_crypto_sign_keypair() : null;
+    $secretKey ??= sodium_crypto_sign_secretkey($keyPair);
+    $publicKey = $keyPair === null
+        ? sodium_crypto_sign_publickey_from_secretkey($secretKey)
+        : sodium_crypto_sign_publickey($keyPair);
 
     $response = $disposition === BrokeredEffectDisposition::Applied
         ? '{"id":123,"number":"FV/1/2026"}'
@@ -61,14 +148,14 @@ function fakturowniaBrokeredEffectResultFixture(
         'contract' => BrokeredEffectExecutionResult::Contract,
         'version' => BrokeredEffectExecutionResult::Version,
         'algorithm' => BrokeredEffectExecutionResult::Algorithm,
-        'signer_id' => 'native-broker-1',
+        'signer_id' => $signerId,
         'issued_at' => '2026-08-27T08:00:02.000000Z',
-        'expires_at' => '2026-08-27T08:10:02.000000Z',
+        'expires_at' => '2026-08-27T08:09:59.000000Z',
         'launch_manifest_sha256' => str_repeat('1', 64),
         'run_nonce' => base64_encode(str_repeat('n', 32)),
         'authorization_set_sha256' => str_repeat('2', 64),
         'broker_policy_sha256' => str_repeat('3', 64),
-        'supervisor_attestation_sha256' => str_repeat('4', 64),
+        'supervisor_attestation_sha256' => $supervisorAttestationSha256 ?? str_repeat('4', 64),
         'effect_descriptor_sha256' => str_repeat('5', 64),
         'effect_id' => str_repeat('6', 32),
         'cas_record_sha256' => str_repeat('7', 64),
@@ -88,13 +175,149 @@ function fakturowniaBrokeredEffectResultFixture(
     ];
 
     return [
-        'document' => [
-            'envelope' => $envelope,
-            'signature' => base64_encode(sodium_crypto_sign_detached(CanonicalCodec::encode($envelope), $secretKey)),
-        ],
+        'document' => fakturowniaSignNativeBrokerDocument($envelope, $secretKey),
         'public_key' => $publicKey,
     ];
 }
+
+it('verifies a role-separated native broker policy, supervisor attestation and effect result', function (): void {
+    $policyFixture = fakturowniaNativeBrokerTrustPolicyFixture();
+    $observedAt = new DateTimeImmutable('2026-08-27T08:00:03.000000Z');
+    $policy = NativeBrokerTrustPolicy::verify(
+        $policyFixture['document'],
+        'deployment-policy-1',
+        $policyFixture['public_key'],
+        $observedAt,
+    );
+    $attestationFixture = fakturowniaNativeSupervisorAttestationFixture(
+        $policyFixture['supervisor_secret_key'],
+    );
+    $attestation = NativeSupervisorAttestation::fromArray($attestationFixture['document']);
+
+    expect(NativeSupervisorAttestationVerifier::verify(
+        $attestation,
+        $policy,
+        $observedAt,
+        str_repeat('1', 64),
+        base64_encode(str_repeat('n', 32)),
+        str_repeat('2', 64),
+    ))->toBe($attestation)
+        ->and(json_encode($policy, JSON_THROW_ON_ERROR))
+        ->toBe('{"native_broker_trust_policy":"[VERIFIED]","public_keys":"[REDACTED]"}')
+        ->and(fn () => serialize($policy))->toThrow(LogicException::class);
+
+    $resultFixture = fakturowniaBrokeredEffectResultFixture(
+        secretKey: $policyFixture['effect_result_secret_key'],
+        supervisorAttestationSha256: $attestation->sha256(),
+    );
+    $result = BrokeredEffectExecutionResult::fromArray($resultFixture['document']);
+
+    expect(BrokeredEffectExecutionResultVerifier::verify(
+        $result,
+        $attestation,
+        $policy,
+        $observedAt,
+        str_repeat('1', 64),
+        base64_encode(str_repeat('n', 32)),
+        str_repeat('2', 64),
+        str_repeat('5', 64),
+        str_repeat('6', 32),
+        str_repeat('7', 64),
+    ))->toBe($result);
+});
+
+it('rejects policy tampering, role confusion, stale proofs and cross-run bindings', function (): void {
+    $policyFixture = fakturowniaNativeBrokerTrustPolicyFixture();
+    $observedAt = new DateTimeImmutable('2026-08-27T08:00:03.000000Z');
+    $policy = NativeBrokerTrustPolicy::verify(
+        $policyFixture['document'],
+        'deployment-policy-1',
+        $policyFixture['public_key'],
+        $observedAt,
+    );
+    $tamperedPolicy = $policyFixture['document'];
+    $tamperedPolicy['envelope']['argv_sha256'] = str_repeat('a', 64);
+
+    expect(fn () => NativeBrokerTrustPolicy::verify(
+        $tamperedPolicy,
+        'deployment-policy-1',
+        $policyFixture['public_key'],
+        $observedAt,
+    ))->toThrow(InvalidArgumentException::class)
+        ->and(fn () => NativeBrokerTrustPolicy::verify(
+            $policyFixture['document'],
+            'deployment-policy-2',
+            $policyFixture['public_key'],
+            $observedAt,
+        ))->toThrow(InvalidArgumentException::class)
+        ->and(fn () => NativeBrokerTrustPolicy::verify(
+            $policyFixture['document'],
+            'deployment-policy-1',
+            $policyFixture['public_key'],
+            new DateTimeImmutable('2026-08-27T09:00:00.000000Z'),
+        ))->toThrow(InvalidArgumentException::class);
+
+    $attestationFixture = fakturowniaNativeSupervisorAttestationFixture(
+        $policyFixture['supervisor_secret_key'],
+    );
+    $attestation = NativeSupervisorAttestation::fromArray($attestationFixture['document']);
+
+    expect(fn () => NativeSupervisorAttestationVerifier::verify(
+        $attestation,
+        $policy,
+        $observedAt,
+        str_repeat('1', 64),
+        base64_encode(str_repeat('x', 32)),
+        str_repeat('2', 64),
+    ))->toThrow(InvalidArgumentException::class)
+        ->and(fn () => NativeSupervisorAttestationVerifier::verify(
+            $attestation,
+            $policy,
+            new DateTimeImmutable('2026-08-27T08:10:00.000000Z'),
+            str_repeat('1', 64),
+            base64_encode(str_repeat('n', 32)),
+            str_repeat('2', 64),
+        ))->toThrow(InvalidArgumentException::class);
+
+    $roleConfusedFixture = fakturowniaBrokeredEffectResultFixture(
+        secretKey: $policyFixture['supervisor_secret_key'],
+        signerId: 'native-supervisor-1',
+        supervisorAttestationSha256: $attestation->sha256(),
+    );
+    $roleConfusedResult = BrokeredEffectExecutionResult::fromArray($roleConfusedFixture['document']);
+
+    expect(fn () => BrokeredEffectExecutionResultVerifier::verify(
+        $roleConfusedResult,
+        $attestation,
+        $policy,
+        $observedAt,
+        str_repeat('1', 64),
+        base64_encode(str_repeat('n', 32)),
+        str_repeat('2', 64),
+        str_repeat('5', 64),
+        str_repeat('6', 32),
+        str_repeat('7', 64),
+    ))->toThrow(InvalidArgumentException::class);
+
+    $resultFixture = fakturowniaBrokeredEffectResultFixture(
+        secretKey: $policyFixture['effect_result_secret_key'],
+        supervisorAttestationSha256: $attestation->sha256(),
+    );
+    $result = BrokeredEffectExecutionResult::fromArray($resultFixture['document']);
+
+    expect(fn () => BrokeredEffectExecutionResultVerifier::verify(
+        $result,
+        $attestation,
+        $policy,
+        $observedAt,
+        str_repeat('1', 64),
+        base64_encode(str_repeat('n', 32)),
+        str_repeat('2', 64),
+        str_repeat('a', 64),
+        str_repeat('6', 32),
+        str_repeat('7', 64),
+    ))->toThrow(InvalidArgumentException::class);
+});
 
 it('freezes and verifies the signed native supervisor attestation envelope', function (): void {
     $fixture = fakturowniaNativeSupervisorAttestationFixture();
