@@ -2615,6 +2615,15 @@ it('keeps RT3 read surfaces separate from managed artifact and sync capabilities
         )
         ->and($capabilities['invoice.correction.issue']['limitations'])->toContain(
             'S7.1 typed correction DTO and mapping code exists, but no production execution capability, live fixture or brokered effect receipt is published',
+        )
+        ->and($capabilities['invoice.proforma.issue']['classification'])->toBe('exact')
+        ->and($capabilities['invoice.proforma.issue']['live_evidence']['status'])->toBe('pending_implementation')
+        ->and($capabilities['invoice.proforma.issue']['live_evidence']['artifacts'])->toBe([])
+        ->and($capabilities['invoice.proforma.issue']['recovery']['safe_retry'])
+        ->toBe('request_not_started_before_effect_boundary_only')
+        ->and($capabilities['invoice.proforma.issue']['limitations'])->toContain(
+            'The default transport is disabled and cannot open the effect boundary until a consumer binds a reviewed implementation',
+            'No production proforma write capability or live fixture is published',
         );
 });
 

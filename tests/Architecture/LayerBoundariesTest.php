@@ -91,7 +91,7 @@ it('declares the renamed package discovery and kernel dependency', function (): 
     expect($composer)->toBeArray()
         ->and($composer['name'] ?? null)->toBe('cieplik206/laravel-fakturownia')
         ->and($composer['replace']['cieplik206/laravel-fakturownia-client'] ?? null)->toBe('self.version')
-        ->and($composer['require']['cieplik206/laravel-integration-operations'] ?? null)->toBe('^0.3.5')
+        ->and($composer['require']['cieplik206/laravel-integration-operations'] ?? null)->toBe('^0.3.7')
         ->and($composer['extra']['laravel']['providers'] ?? [])->toContain(
             'Cieplik206\\Fakturownia\\Laravel\\FakturowniaServiceProvider',
         );
@@ -125,9 +125,9 @@ it('keeps the complete public and Saloon dispatch surface closed behind the RT-3
             'capability_contract:invoice.correction.issue' => 64,
             'capability_contract:invoice.ksef.ensure_accepted' => 112,
             'capability_contract:invoice.pdf.download' => 253,
+            'capability_contract:invoice.proforma.issue' => 35,
             'capability_contract:invoice.vat.issue' => 159,
             'contract_tooling' => 161,
-            'deferred_capability_contract:invoice.proforma.issue' => 31,
             'deferred_capability_contract:webhook.invoice.receive' => 56,
             'internal_read_boundary' => 20,
             'local_kernel' => 6,
@@ -137,7 +137,7 @@ it('keeps the complete public and Saloon dispatch surface closed behind the RT-3
             'testing_no_io' => 48,
         ])
         ->and(hash_file('sha256', publicMethodInventoryPath()))
-        ->toBe('cfb6572535afe1688a7dc2efb240ba7393996b76a2b791bc49fe08e8f09256e6');
+        ->toBe('6b23544522f6117c125c635d18bb554d4a435055b5893bb69d91c8f8e07d3547');
 
     $statuses = capabilityStatuses($matrix);
 
@@ -295,9 +295,9 @@ function publicMethodInventoryErrors(array $inventory): array
         'capability_contract:invoice.correction.issue',
         'capability_contract:invoice.ksef.ensure_accepted',
         'capability_contract:invoice.pdf.download',
+        'capability_contract:invoice.proforma.issue',
         'capability_contract:invoice.vat.issue',
         'contract_tooling',
-        'deferred_capability_contract:invoice.proforma.issue',
         'deferred_capability_contract:webhook.invoice.receive',
         'internal_read_boundary',
         'local_kernel',

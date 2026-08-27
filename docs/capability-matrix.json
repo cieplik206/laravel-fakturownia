@@ -343,15 +343,15 @@
         },
         {
             "id": "invoice.proforma.issue",
-            "milestone": "later-minor",
-            "classification": "deferred",
+            "milestone": "0.3/S8.2",
+            "classification": "exact",
             "transport": {"method": "POST", "endpoint": "/invoices.json"},
             "semantic_writes": {"count": 1, "effects": ["proforma_create"]},
-            "identity": {"scope": ["provider", "connection", "proforma_semantic_slot"], "fingerprint": ["not_frozen"]},
-            "recovery": {"safe_retry": "disabled_until_capability_gate", "reconciliation": "not_frozen"},
+            "identity": {"scope": ["provider", "connection", "transaction_order", "proforma_semantic_slot", "business_oid"], "fingerprint": ["canonical_proforma_draft", "remote_identity_policy"]},
+            "recovery": {"safe_retry": "request_not_started_before_effect_boundary_only", "reconciliation": "exact_business_oid_with_stable_payload_fingerprint; absent_conclusive_terminates_failed_not_applied"},
             "policy": {"ownership": "pms_separate_proforma_owner_fence", "validation": "standard_invoice_profile", "profile": "rt8_proforma_fail_closed"},
-            "live_evidence": {"required": true, "status": "deferred", "requirements": ["proforma_identity_scope", "single_effect_timeout_reconciliation"], "artifacts": []},
-            "limitations": ["The command, canonical codec, unregistered intent factory, fail-closed handler, reconciliation and projection are implemented offline", "The operation type is not registered by the service provider and therefore cannot be accepted or executed", "The default transport is disabled and cannot open the effect boundary", "VAT identity evidence cannot be reused without a proforma-specific gate"],
+            "live_evidence": {"required": true, "status": "pending_implementation", "requirements": ["dedicated_proforma_evidence_contract", "proforma_identity_scope", "single_effect_timeout_reconciliation", "reviewed_live_transport_binding", "pms_separate_proforma_owner_fence"], "artifacts": []},
+            "limitations": ["The command, canonical codec, registered intent runtime, fail-closed handler, reconciliation and projection are implemented offline", "The default transport is disabled and cannot open the effect boundary until a consumer binds a reviewed implementation", "No production proforma write capability or live fixture is published", "VAT identity evidence cannot be reused without a proforma-specific gate"],
             "blocks_vat_pilot": false
         },
         {

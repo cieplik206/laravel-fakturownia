@@ -105,10 +105,23 @@ use Cieplik206\Fakturownia\Stateful\Ksef\Operations\EnsureAcceptedReconciliation
 use Cieplik206\Fakturownia\Stateful\Ksef\Operations\EnsureAcceptedResultCodec;
 use Cieplik206\Fakturownia\Stateful\Ksef\Operations\EnsureAcceptedRetryPolicy;
 use Cieplik206\Fakturownia\Stateful\Ksef\Operations\FakturowniaKsefInvoiceObservationReader;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\AuthoritativeIssueProformaOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\Contracts\IssueProformaTransport;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\DisabledIssueProformaTransport;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaOperationFactory;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaOperationHandler;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaOutcomeProjectionPlanner;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaOutcomeProjector;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaPayloadCodec;
+use Cieplik206\Fakturownia\Stateful\Proformas\ProformaRequestPayloadMapper;
+use Cieplik206\Fakturownia\Stateful\Proformas\Reconciliation\AuthoritativeIssueProformaReconciliationStrategy;
+use Cieplik206\Fakturownia\Stateful\Proformas\Reconciliation\IssueProformaReconciliationStrategy;
 use Cieplik206\Fakturownia\Stateful\Resources\Contracts\InvoiceResourceProjectionStore;
 use Cieplik206\Fakturownia\Stateful\Resources\Contracts\InvoiceResourceReader;
 use Cieplik206\Fakturownia\Stateful\Resources\Contracts\InvoiceResourceSnapshotProtector;
 use Cieplik206\Fakturownia\Stateful\Resources\IssueInvoiceResourceProjectionMapper;
+use Cieplik206\Fakturownia\Stateful\Resources\IssueProformaResourceProjectionMapper;
 use Cieplik206\IntegrationOperations\Events\OperationTerminalized;
 use Cieplik206\IntegrationOperations\IntegrationOperations;
 use Cieplik206\IntegrationOperations\Persistence\KernelDatabase;
@@ -157,6 +170,18 @@ final class FakturowniaServiceProvider extends ServiceProvider
         $this->app->singleton(IssueInvoiceResourceProjectionMapper::class);
         $this->app->singleton(DisabledIssueInvoiceTransport::class);
         $this->app->alias(DisabledIssueInvoiceTransport::class, IssueInvoiceTransport::class);
+
+        $this->app->singleton(IssueProformaPayloadCodec::class);
+        $this->app->singleton(IssueProformaOperationFactory::class);
+        $this->app->singleton(IssueProformaOperationHandler::class);
+        $this->app->singleton(IssueProformaReconciliationStrategy::class);
+        $this->app->singleton(AuthoritativeIssueProformaReconciliationStrategy::class);
+        $this->app->singleton(IssueProformaOutcomeProjector::class);
+        $this->app->singleton(IssueProformaOutcomeProjectionPlanner::class);
+        $this->app->singleton(ProformaRequestPayloadMapper::class);
+        $this->app->singleton(IssueProformaResourceProjectionMapper::class);
+        $this->app->singleton(DisabledIssueProformaTransport::class);
+        $this->app->alias(DisabledIssueProformaTransport::class, IssueProformaTransport::class);
         $this->app->singleton(SodiumInvoiceResourceSnapshotProtector::class);
         $this->app->alias(
             SodiumInvoiceResourceSnapshotProtector::class,
@@ -250,6 +275,8 @@ final class FakturowniaServiceProvider extends ServiceProvider
         $operations->registerProvider(FakturowniaDiagnosticDefinitionProvider::class);
         $operations->registerProvider(IssueInvoiceOperationDefinitionProvider::class);
         $operations->registerAuthoritativeProvider(AuthoritativeIssueInvoiceOperationDefinitionProvider::class);
+        $operations->registerProvider(IssueProformaOperationDefinitionProvider::class);
+        $operations->registerAuthoritativeProvider(AuthoritativeIssueProformaOperationDefinitionProvider::class);
         $operations->registerProvider(IssueCorrectionOperationDefinitionProvider::class);
         $operations->registerAuthoritativeProvider(AuthoritativeIssueCorrectionOperationDefinitionProvider::class);
         $operations->registerProvider(EnsureAcceptedOperationDefinitionProvider::class);

@@ -11,8 +11,10 @@ use Cieplik206\Fakturownia\Stateful\Invoices\Money;
 use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceCommand;
 use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceOperationFailure;
 use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceResult;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\AuthoritativeIssueProformaOperationDefinitionProvider;
 use Cieplik206\Fakturownia\Stateful\Proformas\Operations\DisabledIssueProformaTransport;
 use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaCommand;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaOperationDefinitionProvider;
 use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaOperationFactory;
 use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaOperationHandler;
 use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaOutcomeProjectionPlanner;
@@ -27,6 +29,7 @@ use Cieplik206\IntegrationOperations\Context\IntegrationContext;
 use Cieplik206\IntegrationOperations\Contracts\EffectBoundary;
 use Cieplik206\IntegrationOperations\Contracts\OperationExecution;
 use Cieplik206\IntegrationOperations\Crypto\CanonicalObject;
+use Cieplik206\IntegrationOperations\Enums\BoundaryMode;
 use Cieplik206\IntegrationOperations\Enums\EffectState;
 use Cieplik206\IntegrationOperations\Enums\OperationStatus;
 use Cieplik206\IntegrationOperations\Enums\ResultAvailability;
@@ -162,7 +165,7 @@ it('enforces the canonical plaintext body limit before any transport exists', fu
         ->toThrow(InvalidArgumentException::class, 'plaintext byte limit');
 });
 
-it('builds a separate fail-closed managed proforma intent without registering remote execution', function (): void {
+it('builds a separate fail-closed managed proforma intent for the registered runtime', function (): void {
     $draft = s82ProformaDraft();
     $identity = s82ProformaIdentity();
     $command = new IssueProformaCommand($draft, $identity);
@@ -172,15 +175,11 @@ it('builds a separate fail-closed managed proforma intent without registering re
         $command,
         IntegrationContext::make(correlationId: 'workflow:proforma:123'),
     );
-    $providerSource = file_get_contents(dirname(__DIR__, 4).'/src/Laravel/FakturowniaServiceProvider.php');
 
     expect($codec->writeActivationSlot($payload))->toBe(IssueProformaPayloadCodec::WriteActivationSlot)
         ->and($codec->decode($payload)->draft->toInvoiceDraft()->kind)->toBe('proforma')
         ->and($accepted->operationType->value)->toBe(IssueProformaOperationFactory::OperationType)
         ->and($accepted->intent->semanticSlot)->toBe(IssueProformaOperationFactory::SemanticSlot)
-        ->and($providerSource)->toBeString()
-        ->not->toContain('IssueProformaOperationFactory')
-        ->not->toContain(IssueProformaOperationFactory::OperationType)
         ->and(fn () => new IssueInvoiceCommand($draft->toInvoiceDraft(), $identity))
         ->toThrow(InvalidArgumentException::class);
 
@@ -191,7 +190,7 @@ it('builds a separate fail-closed managed proforma intent without registering re
         ->toThrow(InvalidArgumentException::class);
 });
 
-it('keeps the proforma runtime unregistered and fail-closed before its live gate', function (): void {
+it('registers an effect-aware proforma definition while keeping the default transport fail closed', function (): void {
     $directory = dirname(__DIR__, 4).'/src/Stateful/Proformas';
     $source = '';
 
@@ -206,9 +205,32 @@ it('keeps the proforma runtime unregistered and fail-closed before its live gate
         ->not->toContain('Method::POST')
         ->not->toContain('->send(')
         ->not->toContain('Connector')
-        ->not->toContain('OperationDefinitionProvider')
+        ->toContain('OperationDefinitionProvider')
         ->toContain('OperationHandler')
         ->toContain('IssueProformaTransport');
+
+    $regularDefinitions = iterator_to_array(IssueProformaOperationDefinitionProvider::definitions(), false);
+    $authoritativeDefinitions = iterator_to_array(
+        AuthoritativeIssueProformaOperationDefinitionProvider::definitions(),
+        false,
+    );
+    $regularDefinition = $regularDefinitions[0] ?? null;
+    $authoritativeDefinition = $authoritativeDefinitions[0] ?? null;
+
+    expect($regularDefinitions)->toHaveCount(1)
+        ->and($regularDefinition?->operationType->value)->toBe(IssueProformaOperationFactory::OperationType)
+        ->and($regularDefinition?->maximumRemoteWrites)->toBe(1)
+        ->and($authoritativeDefinitions)->toHaveCount(1)
+        ->and($authoritativeDefinition?->operationType->value)->toBe(IssueProformaOperationFactory::OperationType)
+        ->and($authoritativeDefinition?->maximumRemoteWrites)->toBe(1)
+        ->and($authoritativeDefinition?->boundaryMode)->toBe(BoundaryMode::Required)
+        ->and($authoritativeDefinition?->safeRetryEvidence)->toBe(['request_not_started'])
+        ->and($authoritativeDefinition?->transportTargets)->toHaveCount(1)
+        ->and($authoritativeDefinition?->transportTargets[0]->method)->toBe('POST')
+        ->and($authoritativeDefinition?->transportTargets[0]->targetTemplate)->toBe('/invoices.json')
+        ->and($authoritativeDefinition?->projection->targetIds)->toBe([
+            InvoiceResourceProjectionPlan::TargetId,
+        ]);
 
     $identity = s82ProformaIdentity();
     $command = new IssueProformaCommand(s82ProformaDraft(), $identity);
@@ -232,7 +254,7 @@ it('keeps the proforma runtime unregistered and fail-closed before its live gate
         ->and($boundary->openCalls)->toBe(0);
 });
 
-it('prepares a typed proforma resource projection without registering the write', function (): void {
+it('prepares a typed proforma resource projection for the registered write', function (): void {
     $draft = s82ProformaDraft();
     $command = new IssueProformaCommand($draft, s82ProformaIdentity());
     $operation = new S82ProformaExecution(

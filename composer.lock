@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "fe2d825b4b1fedd485bae0d6c6fd19e7",
+    "content-hash": "7abb6dabceefde32fc731ca47b26d952",
     "packages": [
         {
             "name": "brick/math",
@@ -136,16 +136,16 @@
         },
         {
             "name": "cieplik206/laravel-integration-operations",
-            "version": "v0.3.6",
+            "version": "v0.3.7",
             "source": {
                 "type": "git",
                 "url": "https://github.com/cieplik206/laravel-integration-operations.git",
-                "reference": "bb8dd429a009f7481ff23e8a4d31b60c6441650a"
+                "reference": "7b6c69ea70b6182cf7bf231b22704ca9e2c276f0"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/cieplik206/laravel-integration-operations/zipball/bb8dd429a009f7481ff23e8a4d31b60c6441650a",
-                "reference": "bb8dd429a009f7481ff23e8a4d31b60c6441650a",
+                "url": "https://api.github.com/repos/cieplik206/laravel-integration-operations/zipball/7b6c69ea70b6182cf7bf231b22704ca9e2c276f0",
+                "reference": "7b6c69ea70b6182cf7bf231b22704ca9e2c276f0",
                 "shasum": ""
             },
             "require": {
@@ -218,7 +218,7 @@
                 "security": "https://github.com/cieplik206/laravel-integration-operations/security/policy",
                 "source": "https://github.com/cieplik206/laravel-integration-operations"
             },
-            "time": "2026-08-27T12:06:15+00:00"
+            "time": "2026-08-27T21:20:17+00:00"
         },
         {
             "name": "dflydev/dot-access-data",

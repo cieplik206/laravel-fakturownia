@@ -16,7 +16,13 @@ use Cieplik206\Fakturownia\Stateful\Diagnostics\FakturowniaDiagnosticProviderExt
 use Cieplik206\Fakturownia\Stateful\Exceptions\ConnectionConfigurationInvalid;
 use Cieplik206\Fakturownia\Stateful\FakturowniaManager;
 use Cieplik206\Fakturownia\Stateful\FakturowniaOperations;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\AuthoritativeIssueProformaOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\Contracts\IssueProformaTransport;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\DisabledIssueProformaTransport;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaOperationFactory;
 use Cieplik206\IntegrationOperations\Contracts\OperationQuery;
+use Cieplik206\IntegrationOperations\Registry\AuthoritativeDefinitionRegistry;
 use Cieplik206\IntegrationOperations\Registry\DefinitionRegistry;
 use Cieplik206\IntegrationOperations\ValueObjects\ConnectionKey;
 use Cieplik206\IntegrationOperations\ValueObjects\OperationType;
@@ -38,6 +44,23 @@ it('discovers and boots without resolving credentials', function (): void {
             new OperationType('fakturownia.diagnostic.echo'),
             1,
         ))->not->toBeNull();
+});
+
+it('registers the proforma runtime with a fail-closed default transport', function (): void {
+    $operationType = new OperationType(IssueProformaOperationFactory::OperationType);
+
+    expect($this->app->make(DefinitionRegistry::class)->find(
+        IssueProformaOperationDefinitionProvider::provider(),
+        $operationType,
+        1,
+    ))->not->toBeNull()
+        ->and($this->app->make(AuthoritativeDefinitionRegistry::class)->find(
+            AuthoritativeIssueProformaOperationDefinitionProvider::provider(),
+            $operationType,
+            1,
+        ))->not->toBeNull()
+        ->and($this->app->make(IssueProformaTransport::class))
+        ->toBeInstanceOf(DisabledIssueProformaTransport::class);
 });
 
 it('injects the shared scoped operation query into resolved connections', function (): void {
