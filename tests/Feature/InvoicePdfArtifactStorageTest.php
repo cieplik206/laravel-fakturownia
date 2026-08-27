@@ -9,8 +9,10 @@ use Cieplik206\Fakturownia\Stateful\Artifacts\ContentAddress;
 use Cieplik206\Fakturownia\Stateful\Artifacts\Contracts\ArtifactContentStream;
 use Cieplik206\Fakturownia\Stateful\Artifacts\Maintenance\Contracts\ArtifactAddressLease;
 use Cieplik206\Fakturownia\Stateful\Artifacts\Maintenance\Contracts\ArtifactAddressLock;
+use Illuminate\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Filesystem\Factory;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Storage;
 
 final class S67StorageStream extends ArtifactContentStream
@@ -124,4 +126,75 @@ it('returns null for an absent address and fails closed for bytes under a false 
     );
 
     expect(fn () => $store->inspect($address))->toThrow(RuntimeException::class);
+});
+
+it('persists the verified MIME type with the immutable object', function (): void {
+    $bytes = "%PDF-1.7\nmetadata\n%%EOF\n";
+    $address = ContentAddress::fromSha256(hash('sha256', $bytes));
+    $namespace = new ArtifactStorageNamespace('fakturownia-artifacts', 'fakturownia/finalized');
+    $storageKey = ArtifactStorageKey::for($namespace, $address);
+    $readCount = 0;
+    $filesystem = Mockery::mock(Filesystem::class);
+    $filesystem->shouldReceive('readStream')
+        ->twice()
+        ->with($storageKey)
+        ->andReturnUsing(function () use (&$readCount, $bytes) {
+            if ($readCount++ === 0) {
+                return false;
+            }
+
+            $stream = fopen('php://temp', 'w+b');
+
+            if (! is_resource($stream)) {
+                throw new RuntimeException('The test artifact stream cannot be created.');
+            }
+
+            fwrite($stream, $bytes);
+            rewind($stream);
+
+            return $stream;
+        });
+    $filesystem->shouldReceive('writeStream')
+        ->once()
+        ->withArgs(function (string $path, mixed $stream, array $options) use ($storageKey, $bytes): bool {
+            if (! is_resource($stream)) {
+                return false;
+            }
+
+            rewind($stream);
+
+            expect($path)->toBe($storageKey)
+                ->and(stream_get_contents($stream))->toBe($bytes)
+                ->and($options)->toBe([
+                    'visibility' => Filesystem::VISIBILITY_PRIVATE,
+                    'mimetype' => 'application/pdf',
+                ]);
+
+            return true;
+        })
+        ->andReturnTrue();
+    $filesystems = Mockery::mock(Factory::class);
+    $filesystems->shouldReceive('disk')
+        ->with('fakturownia-artifacts')
+        ->andReturn($filesystem);
+
+    if (! $filesystems instanceof Factory) {
+        throw new RuntimeException('The filesystem factory test double is invalid.');
+    }
+
+    $configuration = new ConfigRepository([
+        'fakturownia' => [
+            'artifacts' => [
+                'disk' => 'fakturownia-artifacts',
+                'prefix' => 'fakturownia/finalized',
+            ],
+        ],
+    ]);
+    $store = new FilesystemContentAddressedArtifactStore(
+        $filesystems,
+        $configuration,
+        new S67StorageLock,
+    );
+
+    expect($store->put(new S67StorageStream($bytes), 'application/pdf')->contentAddress)->toEqual($address);
 });

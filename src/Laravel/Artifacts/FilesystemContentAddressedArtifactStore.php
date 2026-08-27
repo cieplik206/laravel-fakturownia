@@ -65,7 +65,10 @@ final readonly class FilesystemContentAddressedArtifactStore implements ContentA
                     || ! $this->disk($namespace)->writeStream(
                         ArtifactStorageKey::for($namespace, $address),
                         $temporary,
-                        ['visibility' => Filesystem::VISIBILITY_PRIVATE],
+                        [
+                            'visibility' => Filesystem::VISIBILITY_PRIVATE,
+                            'mimetype' => $mimeType,
+                        ],
                     )) {
                     throw new RuntimeException('The immutable artifact object could not be stored.');
                 }
