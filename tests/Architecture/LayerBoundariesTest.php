@@ -126,7 +126,7 @@ it('keeps the complete public and Saloon dispatch surface closed behind the RT-3
             'capability_contract:invoice.ksef.ensure_accepted' => 112,
             'capability_contract:invoice.pdf.download' => 253,
             'capability_contract:invoice.vat.issue' => 159,
-            'contract_tooling' => 116,
+            'contract_tooling' => 150,
             'deferred_capability_contract:invoice.proforma.issue' => 9,
             'deferred_capability_contract:webhook.invoice.receive' => 56,
             'internal_read_boundary' => 20,
@@ -137,7 +137,7 @@ it('keeps the complete public and Saloon dispatch surface closed behind the RT-3
             'testing_no_io' => 48,
         ])
         ->and(hash_file('sha256', publicMethodInventoryPath()))
-        ->toBe('eda25e5f5bdec712f94592536fad6babb1a989f9a54d47be93a9c8a2a1ed148c');
+        ->toBe('a0cc8d9356fee4954b40686b13d5c7e2257f633264502d88ed62772a412021a6');
 
     $statuses = capabilityStatuses($matrix);
 
