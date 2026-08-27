@@ -142,6 +142,35 @@ dispatch queue work, or validate credentials. Configuration is resolved lazily
 when a connection is requested, so missing or invalid values do not break
 application boot and fail closed at first use.
 
+## Operator diagnostics and artifact retention
+
+Run the provider doctor after application migrations and before enabling any
+managed writer:
+
+    php artisan fakturownia:doctor
+
+The doctor validates every configured connection locally, verifies the five
+frozen provider operation definitions, and checks that a capability-aware
+artifact maintenance backend is bound. When that backend is available, the
+artifact doctor performs a complete read-only descriptor-to-object integrity
+scan. Output contains counters and safe reason codes only; tokens, document
+data, remote identities, storage keys, and exception details are withheld.
+
+Artifact retention is deliberately separate from the doctor:
+
+    php artisan fakturownia:artifacts:maintain doctor
+    php artisan fakturownia:artifacts:maintain prune --force
+    php artisan fakturownia:artifacts:maintain sweep --force
+
+`prune` handles expired durable descriptors and `sweep` handles old unreferenced
+objects. Both commands process bounded batches and refuse to run without
+`--force`. The consuming application must bind
+`ArtifactMaintenanceStoreFactory` to a reviewed backend that proves bounded
+listing, reliable object age, and conditional generation deletion. The package
+does not pretend that a generic Laravel filesystem driver provides those
+capabilities: without the binding, doctor and retention fail closed before any
+deletion.
+
 The connection also exposes a provider- and connection-scoped view of durable
 operations stored by the shared kernel:
 

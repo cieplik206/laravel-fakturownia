@@ -13,7 +13,9 @@ use Cieplik206\Fakturownia\Laravel\Artifacts\DatabaseArtifactStore;
 use Cieplik206\Fakturownia\Laravel\Artifacts\DispatchInvoicePdfReady;
 use Cieplik206\Fakturownia\Laravel\Artifacts\FakturowniaInvoicePdfSourceReader;
 use Cieplik206\Fakturownia\Laravel\Artifacts\FilesystemContentAddressedArtifactStore;
+use Cieplik206\Fakturownia\Laravel\Console\DoctorFakturowniaCommand;
 use Cieplik206\Fakturownia\Laravel\Console\InstallFakturowniaCommand;
+use Cieplik206\Fakturownia\Laravel\Console\MaintainFakturowniaArtifactsCommand;
 use Cieplik206\Fakturownia\Laravel\Contracts\ConfigurationPublisher;
 use Cieplik206\Fakturownia\Laravel\Ksef\DatabaseKsefStateProjectionStore;
 use Cieplik206\Fakturownia\Laravel\Ksef\DispatchInvoiceKsefAccepted;
@@ -271,7 +273,11 @@ final class FakturowniaServiceProvider extends ServiceProvider
         ], 'fakturownia-config');
 
         if ($this->app->runningInConsole()) {
-            $this->commands([InstallFakturowniaCommand::class]);
+            $this->commands([
+                DoctorFakturowniaCommand::class,
+                InstallFakturowniaCommand::class,
+                MaintainFakturowniaArtifactsCommand::class,
+            ]);
         }
     }
 }

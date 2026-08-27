@@ -89,3 +89,26 @@ it('propagates configuration publisher failures from the install command', funct
 
     expect(Artisan::call('fakturownia:install'))->toBe(1);
 });
+
+it('registers fail-closed provider and artifact maintenance diagnostics without leaking credentials', function (): void {
+    config()->set('fakturownia.connections.default.token', 'doctor-secret-token');
+    Http::fake();
+    Queue::fake();
+
+    $doctorExitCode = Artisan::call('fakturownia:doctor');
+    $doctorOutput = Artisan::output();
+    $maintenanceExitCode = Artisan::call('fakturownia:artifacts:maintain', [
+        'action' => 'prune',
+    ]);
+    $maintenanceOutput = Artisan::output();
+
+    expect($doctorExitCode)->toBe(1)
+        ->and($doctorOutput)->toContain('capability-aware artifact maintenance store is not bound')
+        ->and($doctorOutput)->not->toContain('doctor-secret-token')
+        ->and($maintenanceExitCode)->toBe(2)
+        ->and($maintenanceOutput)->toContain('requires the explicit --force option')
+        ->and($maintenanceOutput)->not->toContain('doctor-secret-token');
+
+    Http::assertNothingSent();
+    Queue::assertNothingPushed();
+});

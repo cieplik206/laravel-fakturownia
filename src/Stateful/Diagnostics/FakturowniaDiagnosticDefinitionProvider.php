@@ -18,6 +18,8 @@ use Cieplik206\IntegrationOperations\ValueObjects\ProviderKey;
 
 final readonly class FakturowniaDiagnosticDefinitionProvider implements OperationDefinitionProvider
 {
+    public const string OperationType = 'fakturownia.diagnostic.echo';
+
     public static function provider(): ProviderKey
     {
         return new ProviderKey('fakturownia');
@@ -28,7 +30,7 @@ final readonly class FakturowniaDiagnosticDefinitionProvider implements Operatio
     {
         yield OperationDefinition::readOnly(
             provider: self::provider(),
-            operationType: new OperationType('fakturownia.diagnostic.echo'),
+            operationType: new OperationType(self::OperationType),
             versions: new OperationDefinitionVersions(1, 1, 1),
             handler: self::extension(OperationHandler::class),
             failureClassifier: self::extension(FailureClassifier::class),
