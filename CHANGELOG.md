@@ -9,6 +9,8 @@ Versioning.
 
 ### Added
 
+- Expose the provider client `shortcut` as a typed nullable field on
+  `ClientResponseData` instead of leaving it in the extension payload.
 - Add the explicit `fakturownia.invoice.ksef.ensure_accepted` operation with
   disjoint SDK-send and provider-auto ownership profiles, deadline polling,
   lost-response reconciliation, and a hard one-write budget.

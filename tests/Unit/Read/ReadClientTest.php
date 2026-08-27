@@ -166,6 +166,7 @@ it('keeps clients products and payments as independent typed resources', functio
         rt3JsonExchange($clientRequest, [
             'id' => 7,
             'name' => 'ACME',
+            'shortcut' => 'ACME',
             'tax_no' => '1234567890',
             'company' => 'yes',
             'unexpected_client_flag' => 'kept',
@@ -203,6 +204,7 @@ it('keeps clients products and payments as independent typed resources', functio
     $payment = $paymentPage->items()[0];
 
     expect($client->remoteId)->toBe('7')
+        ->and($client->shortcut)->toBe('ACME')
         ->and($client->company)->toBeTrue()
         ->and($client->extra())->toBe(['unexpected_client_flag' => 'kept'])
         ->and($product->remoteId)->toBe('9')

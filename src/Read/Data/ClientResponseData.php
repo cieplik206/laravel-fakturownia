@@ -15,6 +15,7 @@ final readonly class ClientResponseData
     private function __construct(
         public string $remoteId,
         public ?string $name,
+        public ?string $shortcut,
         public ?string $taxNumber,
         public ?string $email,
         public ?string $phone,
@@ -39,6 +40,7 @@ final readonly class ClientResponseData
         return new self(
             remoteId: $reader->requiredId('id'),
             name: $reader->nullableString('name'),
+            shortcut: $reader->nullableString('shortcut'),
             taxNumber: $reader->nullableString('tax_no'),
             email: $reader->nullableString('email'),
             phone: $reader->nullableString('phone'),
@@ -51,7 +53,7 @@ final readonly class ClientResponseData
             createdAt: $reader->nullableTimestamp('created_at'),
             updatedAt: $reader->nullableTimestamp('updated_at'),
             extraFields: $reader->extra([
-                'id', 'name', 'tax_no', 'email', 'phone', 'street', 'city', 'post_code', 'country', 'external_id',
+                'id', 'name', 'shortcut', 'tax_no', 'email', 'phone', 'street', 'city', 'post_code', 'country', 'external_id',
                 'company', 'created_at', 'updated_at',
             ]),
         );
