@@ -93,6 +93,22 @@ final readonly class ProformaDraft
         ];
     }
 
+    public function toInvoiceDraft(): InvoiceDraft
+    {
+        return new InvoiceDraft(
+            kind: 'proforma',
+            income: true,
+            sellDate: $this->sellDate,
+            issueDate: $this->issueDate,
+            departmentId: $this->departmentId,
+            buyer: $this->buyer,
+            payment: $this->payment,
+            description: $this->description,
+            positions: $this->positions,
+            number: $this->number,
+        );
+    }
+
     private static function copyBuyer(InvoiceBuyer $buyer): InvoiceBuyer
     {
         return new InvoiceBuyer(

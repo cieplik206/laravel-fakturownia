@@ -71,7 +71,7 @@ it('round trips every supported identity policy without serializing uniqueness t
     }
 });
 
-it('rejects native command serialization and non VAT or mismatched issue commands', function (): void {
+it('rejects native command serialization and unsupported or mismatched issue commands', function (): void {
     $draft = InvoiceFixtures::draft();
     $command = new IssueInvoiceCommand(
         $draft,
@@ -86,6 +86,10 @@ it('rejects native command serialization and non VAT or mismatched issue command
     expect(fn (): string => serialize($command))->toThrow(LogicException::class)
         ->and(fn (): IssueInvoiceCommand => new IssueInvoiceCommand(
             rt44IssueInvoicePayloadDraft($draft->positions, income: false),
+            RemoteInvoiceIdentity::withoutRemoteUniqueness(InvoiceFixtures::scope()),
+        ))->toThrow(InvalidArgumentException::class)
+        ->and(fn (): IssueInvoiceCommand => new IssueInvoiceCommand(
+            rt44IssueInvoicePayloadDraft($draft->positions, kind: 'receipt'),
             RemoteInvoiceIdentity::withoutRemoteUniqueness(InvoiceFixtures::scope()),
         ))->toThrow(InvalidArgumentException::class)
         ->and(fn (): IssueInvoiceCommand => new IssueInvoiceCommand(
@@ -205,12 +209,12 @@ it('accepts the exact kernel payload ceiling and rejects one byte more', functio
 });
 
 /** @param list<InvoiceLine> $positions */
-function rt44IssueInvoicePayloadDraft(array $positions, bool $income = true): InvoiceDraft
+function rt44IssueInvoicePayloadDraft(array $positions, bool $income = true, string $kind = 'vat'): InvoiceDraft
 {
     $draft = InvoiceFixtures::draft();
 
     return new InvoiceDraft(
-        kind: $draft->kind,
+        kind: $kind,
         income: $income,
         sellDate: $draft->sellDate,
         issueDate: $draft->issueDate,

@@ -2,12 +2,22 @@
 
 declare(strict_types=1);
 
+use Cieplik206\Fakturownia\Stateful\Invoices\Identity\OidUniquenessGate;
+use Cieplik206\Fakturownia\Stateful\Invoices\Identity\RemoteIdentityScope;
+use Cieplik206\Fakturownia\Stateful\Invoices\Identity\RemoteInvoiceIdentity;
 use Cieplik206\Fakturownia\Stateful\Invoices\InvoiceBuyer;
 use Cieplik206\Fakturownia\Stateful\Invoices\InvoiceLine;
 use Cieplik206\Fakturownia\Stateful\Invoices\Money;
+use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceCommand;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaCommand;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaOperationFactory;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaPayloadCodec;
 use Cieplik206\Fakturownia\Stateful\Proformas\ProformaDraft;
 use Cieplik206\Fakturownia\Stateful\Proformas\ProformaRequestPayload;
 use Cieplik206\Fakturownia\Stateful\Proformas\ProformaRequestPayloadMapper;
+use Cieplik206\IntegrationOperations\Context\IntegrationContext;
+use Cieplik206\IntegrationOperations\Crypto\CanonicalObject;
+use Cieplik206\IntegrationOperations\ValueObjects\ConnectionKey;
 
 it('maps a fixed-kind unpaid proforma to the synthetic credential-free contract fixture', function (): void {
     $fixture = s82ProformaRequestFixture();
@@ -80,19 +90,57 @@ it('enforces the canonical plaintext body limit before any transport exists', fu
         ->toThrow(InvalidArgumentException::class, 'plaintext byte limit');
 });
 
-it('contains no proforma transport or operation registration surface', function (): void {
+it('builds a separate fail-closed managed proforma intent without enabling remote execution', function (): void {
+    $draft = s82ProformaDraft();
+    $identity = RemoteInvoiceIdentity::businessOid(
+        new RemoteIdentityScope(new ConnectionKey('sales'), 'proforma', '376237'),
+        'PROFORMA-123',
+        OidUniquenessGate::notPassed(),
+    );
+    $command = new IssueProformaCommand($draft, $identity);
+    $codec = new IssueProformaPayloadCodec;
+    $payload = $codec->encode($command);
+    $accepted = (new IssueProformaOperationFactory)->make(
+        $command,
+        IntegrationContext::make(correlationId: 'workflow:proforma:123'),
+    );
+    $providerSource = file_get_contents(dirname(__DIR__, 4).'/src/Laravel/FakturowniaServiceProvider.php');
+
+    expect($codec->writeActivationSlot($payload))->toBe(IssueProformaPayloadCodec::WriteActivationSlot)
+        ->and($codec->decode($payload)->draft->toInvoiceDraft()->kind)->toBe('proforma')
+        ->and($accepted->operationType->value)->toBe(IssueProformaOperationFactory::OperationType)
+        ->and($accepted->intent->semanticSlot)->toBe(IssueProformaOperationFactory::SemanticSlot)
+        ->and($providerSource)->toBeString()
+        ->not->toContain('IssueProformaOperationFactory')
+        ->not->toContain(IssueProformaOperationFactory::OperationType)
+        ->and(fn () => new IssueInvoiceCommand($draft->toInvoiceDraft(), $identity))
+        ->toThrow(InvalidArgumentException::class);
+
+    $wrongSlot = $payload->values;
+    $wrongSlot['write_activation_slot'] = 'invoice.vat.issue';
+
+    expect(fn () => $codec->decode(new CanonicalObject($wrongSlot)))
+        ->toThrow(InvalidArgumentException::class);
+});
+
+it('contains no proforma transport or operation definition registration surface', function (): void {
     $directory = dirname(__DIR__, 4).'/src/Stateful/Proformas';
     $source = '';
 
-    foreach (glob($directory.'/*.php') ?: [] as $path) {
-        $source .= (string) file_get_contents($path);
+    $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory));
+    foreach ($files as $file) {
+        if ($file->isFile() && $file->getExtension() === 'php') {
+            $source .= (string) file_get_contents($file->getPathname());
+        }
     }
 
     expect($source)
         ->not->toContain('Method::POST')
         ->not->toContain('->send(')
         ->not->toContain('Connector')
-        ->not->toContain('OperationDefinition')
+        ->not->toContain('OperationDefinitionProvider')
+        ->not->toContain('OperationHandler')
+        ->not->toContain('IssueInvoiceTransport')
         ->not->toContain('oid_unique');
 });
 

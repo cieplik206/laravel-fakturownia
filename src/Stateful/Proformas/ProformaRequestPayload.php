@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Cieplik206\Fakturownia\Stateful\Proformas;
 
-use Cieplik206\Fakturownia\Stateful\Invoices\InvoiceDraft;
 use Cieplik206\Fakturownia\Stateful\Invoices\InvoiceDraftValidator;
 use Cieplik206\Fakturownia\Stateful\Invoices\InvoiceLine;
 use Cieplik206\Fakturownia\Stateful\Invoices\InvoiceValidationProfile;
@@ -49,18 +48,7 @@ final readonly class ProformaRequestPayload
             positions: $draft->positions,
             number: $draft->number,
         );
-        $invoice = new InvoiceDraft(
-            kind: 'proforma',
-            income: true,
-            sellDate: $draft->sellDate,
-            issueDate: $draft->issueDate,
-            departmentId: $draft->departmentId,
-            buyer: $draft->buyer,
-            payment: $draft->payment,
-            description: $draft->description,
-            positions: $draft->positions,
-            number: $draft->number,
-        );
+        $invoice = $draft->toInvoiceDraft();
 
         (new InvoiceDraftValidator)
             ->validate($invoice, InvoiceValidationProfile::Standard)
