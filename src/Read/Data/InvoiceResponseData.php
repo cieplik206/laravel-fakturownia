@@ -146,6 +146,49 @@ final readonly class InvoiceResponseData
         return $this->extraFields;
     }
 
+    /** @return array<string, mixed> */
+    public function toPayload(): array
+    {
+        return [
+            ...$this->extraFields,
+            'id' => $this->remoteId,
+            'user_id' => $this->userId,
+            'number' => $this->number,
+            'kind' => $this->kind?->raw,
+            'status' => $this->status?->raw,
+            'issue_date' => $this->issueDate?->value,
+            'sell_date' => $this->sellDate?->value,
+            'payment_to' => $this->paymentTo?->value,
+            'paid_date' => $this->paidDate?->value,
+            'payment_type' => $this->paymentType,
+            'price_net' => $this->priceNet?->value,
+            'price_tax' => $this->priceTax?->value,
+            'price_gross' => $this->priceGross?->value,
+            'paid' => $this->paid?->value,
+            'currency' => $this->currency,
+            'description' => $this->description,
+            'seller_name' => $this->sellerName,
+            'seller_tax_no' => $this->sellerTaxNumber,
+            'buyer_name' => $this->buyerName,
+            'buyer_tax_no' => $this->buyerTaxNumber,
+            'buyer_email' => $this->buyerEmail,
+            'client_id' => $this->clientId,
+            'department_id' => $this->departmentId,
+            'oid' => $this->sourceOid,
+            'from_invoice_id' => $this->fromInvoiceId,
+            'income' => $this->income,
+            'cancelled' => $this->cancelled,
+            'gov_id' => $this->governmentId,
+            'gov_status' => $this->governmentStatus,
+            'created_at' => $this->createdAt?->value,
+            'updated_at' => $this->updatedAt?->value,
+            'positions' => array_map(
+                static fn (InvoicePositionData $position): array => $position->toPayload(),
+                $this->positions,
+            ),
+        ];
+    }
+
     private static function kind(?string $value, string $operation): ?OpenInvoiceKind
     {
         if ($value === null) {

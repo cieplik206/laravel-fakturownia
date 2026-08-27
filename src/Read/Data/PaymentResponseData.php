@@ -73,4 +73,28 @@ final readonly class PaymentResponseData
     {
         return $this->extraFields;
     }
+
+    /** @return array<string, mixed> */
+    public function toPayload(): array
+    {
+        return [
+            ...$this->extraFields,
+            'id' => $this->remoteId,
+            'name' => $this->name,
+            'price' => $this->price?->value,
+            'currency' => $this->currency,
+            'paid' => $this->paid,
+            'kind' => $this->kind,
+            'invoice_id' => $this->invoiceId,
+            'client_id' => $this->clientId,
+            'description' => $this->description,
+            'paid_date' => $this->paidAt?->value,
+            'created_at' => $this->createdAt?->value,
+            'updated_at' => $this->updatedAt?->value,
+            'invoices' => array_map(
+                static fn (InvoiceResponseData $invoice): array => $invoice->toPayload(),
+                $this->invoices,
+            ),
+        ];
+    }
 }

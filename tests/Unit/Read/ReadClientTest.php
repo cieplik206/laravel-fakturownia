@@ -128,6 +128,20 @@ it('maps invoice pages into lossless typed DTOs with open enums and canonical de
         ->and($position->quantity?->value)->toBe('2')
         ->and($position->tax)->toBe('23')
         ->and($position->extra())->toBe(['future_position_field' => ['safe' => true]])
+        ->and($invoice->toPayload())->toMatchArray([
+            'id' => '9223372036854775808',
+            'kind' => 'future_vat_kind',
+            'sell_date' => '2026-08',
+            'price_net' => '89.9',
+            'future_invoice_field' => ['version' => 2],
+        ])
+        ->and($invoice->toPayload()['positions'][0])->toMatchArray([
+            'id' => '501',
+            'quantity' => '2',
+            'tax' => '23',
+            'price_net' => '44.95',
+            'future_position_field' => ['safe' => true],
+        ])
         ->and($sentRequest->path())->toBe('/invoices.json')
         ->and($sentRequest->query()->all())->toMatchArray([
             'date_from' => '2026-08-01',
@@ -200,6 +214,16 @@ it('keeps clients products and payments as independent typed resources', functio
         ->and($payment->paid)->toBeTrue()
         ->and($payment->paidAt)->toBeInstanceOf(ApiDate::class)
         ->and($payment->invoices[0]->remoteId)->toBe('123')
+        ->and($payment->toPayload())->toMatchArray([
+            'id' => '77',
+            'price' => '100.5',
+            'paid' => true,
+            'paid_date' => '2026-08-25',
+        ])
+        ->and($payment->toPayload()['invoices'][0])->toMatchArray([
+            'id' => '123',
+            'kind' => KnownInvoiceKind::Vat->value,
+        ])
         ->and($executor->requests()[2]->query()->all())->toMatchArray([
             'include' => 'invoices',
             'page' => 1,

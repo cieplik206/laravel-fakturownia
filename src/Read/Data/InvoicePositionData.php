@@ -74,4 +74,25 @@ final readonly class InvoicePositionData
     {
         return $this->extraFields;
     }
+
+    /** @return array<string, mixed> */
+    public function toPayload(): array
+    {
+        return [
+            ...$this->extraFields,
+            'id' => $this->remoteId,
+            'invoice_id' => $this->invoiceId,
+            'product_id' => $this->productId,
+            'name' => $this->name,
+            'code' => $this->code,
+            'description' => $this->description,
+            'quantity' => $this->quantity?->value,
+            'quantity_unit' => $this->unit,
+            'tax' => $this->tax,
+            'price_net' => $this->priceNet?->value,
+            'price_gross' => $this->priceGross?->value,
+            'total_price_net' => $this->totalPriceNet?->value,
+            'total_price_gross' => $this->totalPriceGross?->value,
+        ];
+    }
 }

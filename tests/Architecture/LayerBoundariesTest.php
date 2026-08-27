@@ -132,12 +132,12 @@ it('keeps the complete public and Saloon dispatch surface closed behind the RT-3
             'internal_read_boundary' => 20,
             'local_kernel' => 6,
             'local_shadow' => 57,
-            'read_contract' => 200,
+            'read_contract' => 203,
             'read_facade' => 18,
             'testing_no_io' => 48,
         ])
         ->and(hash_file('sha256', publicMethodInventoryPath()))
-        ->toBe('541f227b9d323e352827e8209bd161a18961371891bd1315e4be241f0a44777c');
+        ->toBe('eda25e5f5bdec712f94592536fad6babb1a989f9a54d47be93a9c8a2a1ed148c');
 
     $statuses = capabilityStatuses($matrix);
 
