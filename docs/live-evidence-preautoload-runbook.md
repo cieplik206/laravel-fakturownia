@@ -164,6 +164,45 @@ Credential and authorization source files are root-owned, non-hardlinked regular
 
 Until this native supervisor is reviewed and provisioned, no command in this repository is a live execution path.
 
+## N/N-1 supervisor and broker rolling deployment
+
+This procedure becomes executable only after the native supervisor and broker
+exist, pass their dedicated security review, and are pinned by a signed release
+manifest. It does not authorize replacing the current fail-closed launcher.
+
+Release N and N-1 may coexist only when both accept the same versioned wire
+envelope and independently verify the exact peer binary, policy, signer,
+manifest, snapshot, UID/GID, argv, and environment bindings. A wire version is
+immutable; incompatible semantics require a new version and a staged broker
+that explicitly supports both versions.
+
+1. Build supervisor, broker, launcher snapshot, and PHP dependencies from the
+   signed release commits. Record their hashes in the release manifest.
+2. Install N alongside N-1 at new content-addressed paths. Never overwrite a
+   binary, policy, key, manifest, or snapshot in place.
+3. Run the offline verifier and a no-effect readiness handshake for N. The
+   broker must not open the provider credential or allocate an effect CAS record
+   during readiness.
+4. Confirm that N supports every unexpired authorization, claim, and CAS record
+   created by N-1. N-1 must reject N-only wire versions without changing their
+   state.
+5. Route one explicitly authorized throwaway DEMO run to N. Keep N-1 available
+   for already-started N-1 runs; never move a run nonce, authorization set, CAS
+   record, or result receipt between broker generations.
+6. Compare signed result receipts, failure codes, latency, and redaction output.
+   Do not use provider payloads, OIDs, remote IDs, or credentials as metrics.
+7. Increase the N cohort only after one complete authorization and evidence
+   retention window without verifier, CAS, or receipt mismatch.
+8. Roll back by routing new runs to the still-installed N-1 content address.
+   Let N-owned runs finish or expire under N; never replay them through N-1.
+9. Remove N-1 only after every N-1 authorization, run nonce, CAS record, signed
+   receipt, and evidence retention deadline has expired and the audit is empty.
+
+Any mismatch closes the N cohort, leaves the provider credential unopened when
+possible, preserves existing CAS/receipt state, and requires a new signed
+release. Editing a policy, weakening verification, copying a nonce, or issuing a
+second provider request is not a rollback.
+
 ## Failure and rotation
 
 Missing native-supervisor deployment, direct PHP invocation, or any schema, signature, content address, runtime, mode, owner, link-count, tree, package, source, harness, Composer bootstrap, policy, key, launcher, peer-credential, READY, argv, environment, UID/GID, seal, or manifest-handoff mismatch exits with code `78` before the credential/authorization files are opened. Do not retry by weakening policy or editing a snapshot.
