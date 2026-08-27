@@ -3,8 +3,13 @@
 declare(strict_types=1);
 
 use Cieplik206\Fakturownia\Client\Contracts\ClientFactory;
+use Cieplik206\Fakturownia\Laravel\Artifacts\PostgresArtifactMaintenanceManagerFactory;
 use Cieplik206\Fakturownia\Laravel\ConfigConnectionResolver;
 use Cieplik206\Fakturownia\Laravel\Contracts\ConfigurationPublisher;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Maintenance\ArtifactMaintenanceReport;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Maintenance\ArtifactPurgePermitVerifier;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Maintenance\Contracts\ArtifactMaintenanceStore;
+use Cieplik206\Fakturownia\Stateful\Artifacts\Maintenance\Contracts\ArtifactMaintenanceStoreFactory;
 use Cieplik206\Fakturownia\Stateful\Contracts\ConnectionResolver;
 use Cieplik206\Fakturownia\Stateful\Diagnostics\FakturowniaDiagnosticDefinitionProvider;
 use Cieplik206\Fakturownia\Stateful\Diagnostics\FakturowniaDiagnosticProviderExtensions;
@@ -111,4 +116,45 @@ it('registers fail-closed provider and artifact maintenance diagnostics without 
 
     Http::assertNothingSent();
     Queue::assertNothingPushed();
+});
+
+it('emits a bounded artifact maintenance cursor and fails until the batch is complete', function (): void {
+    $continuationCursor = '01K3NTQ7V8R2K9X4M6P1C5D0HF';
+
+    $this->app->instance(ArtifactMaintenanceStoreFactory::class, new class implements ArtifactMaintenanceStoreFactory
+    {
+        public function make(ArtifactPurgePermitVerifier $purgePermitVerifier): ArtifactMaintenanceStore
+        {
+            throw new LogicException('The command factory substitution must prevent store resolution.');
+        }
+    });
+    $this->app->instance(PostgresArtifactMaintenanceManagerFactory::class, new class($continuationCursor)
+    {
+        public function __construct(private readonly string $continuationCursor) {}
+
+        public function make(): object
+        {
+            return new class($this->continuationCursor)
+            {
+                public function __construct(private readonly string $continuationCursor) {}
+
+                public function prune(?string $after): ArtifactMaintenanceReport
+                {
+                    expect($after)->toBeNull();
+
+                    return new ArtifactMaintenanceReport(100, 100, 100, 0, [], $this->continuationCursor);
+                }
+            };
+        }
+    });
+
+    $exitCode = Artisan::call('fakturownia:artifacts:maintain', [
+        'action' => 'prune',
+        '--force' => true,
+    ]);
+    $output = Artisan::output();
+
+    expect($exitCode)->toBe(1)
+        ->and($output)->toContain('bounded batch is incomplete')
+        ->and($output)->toContain('continuation_cursor: '.$continuationCursor);
 });

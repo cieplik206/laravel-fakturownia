@@ -66,7 +66,7 @@ final class MaintainFakturowniaArtifactsCommand extends Command
 
         $this->renderReport($report);
 
-        return $report->totalFindings === 0 ? self::SUCCESS : self::FAILURE;
+        return $report->passes() ? self::SUCCESS : self::FAILURE;
     }
 
     private function renderReport(ArtifactMaintenanceReport $report): void
@@ -102,7 +102,10 @@ final class MaintainFakturowniaArtifactsCommand extends Command
         }
 
         if ($report->nextArtifactId !== null || $report->nextObjectAddress !== null) {
-            $this->components->warn('The bounded batch has a continuation cursor. Re-run with the emitted cursor from trusted operator tooling.');
+            $continuationCursor = $report->nextArtifactId ?? (string) $report->nextObjectAddress;
+
+            $this->components->warn('The bounded batch is incomplete. Re-run with the continuation cursor.');
+            $this->line('continuation_cursor: '.$continuationCursor);
         }
     }
 }
