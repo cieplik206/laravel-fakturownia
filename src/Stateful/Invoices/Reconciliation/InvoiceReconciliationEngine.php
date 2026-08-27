@@ -7,10 +7,14 @@ namespace Cieplik206\Fakturownia\Stateful\Invoices\Reconciliation;
 use Cieplik206\Fakturownia\Stateful\FakturowniaManager;
 use Cieplik206\Fakturownia\Stateful\Invoices\Identity\ExactOidLocator;
 use Cieplik206\Fakturownia\Stateful\Invoices\Identity\InvoiceFingerprint;
+use Cieplik206\Fakturownia\Stateful\Invoices\Identity\RemoteInvoiceIdentity;
 use Cieplik206\Fakturownia\Stateful\Invoices\InvoiceDraft;
+use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceCommand;
 use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoicePayloadCodec;
 use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceResult;
 use Cieplik206\Fakturownia\Stateful\Invoices\Reconciliation\Contracts\InvoiceReconciliationConfiguration;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaCommand;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaPayloadCodec;
 use Cieplik206\IntegrationOperations\Contracts\AuthoritativeReconciliationContext;
 use Cieplik206\IntegrationOperations\Contracts\ReconciliationContext;
 use Cieplik206\IntegrationOperations\Crypto\HmacSha256;
@@ -55,15 +59,15 @@ final readonly class InvoiceReconciliationEngine
     public function reconcileAuthoritative(
         AuthoritativeReconciliationContext $context,
     ): AuthoritativeReconciliationOutcome {
-        $command = (new IssueInvoicePayloadCodec)->decode($context->payload());
+        ['draft' => $draft, 'identity' => $identity] = $this->reconciliationPayload($context);
 
-        if (! $command->identity->scope->connection->equals($context->scope()->connection)) {
+        if (! $identity->scope->connection->equals($context->scope()->connection)) {
             return AuthoritativeReconciliationOutcome::inconclusive(
                 'fakturownia.invoice.operation_scope_mismatch',
             );
         }
 
-        $locator = $command->identity->exactLocator();
+        $locator = $identity->exactLocator();
 
         if (! $locator instanceof ExactOidLocator) {
             return AuthoritativeReconciliationOutcome::ambiguousMatches(
@@ -73,15 +77,15 @@ final readonly class InvoiceReconciliationEngine
         }
 
         $expectation = new InvoiceReconciliationExpectation(
-            draft: $command->draft,
-            identity: $command->identity,
+            draft: $draft,
+            identity: $identity,
             origin: $this->origin($context->reconciliationTrigger()),
             effectPossiblyStartedAt: $context->effectPossiblyStartedAt(),
             observationNumber: $context->observationNumber(),
             previousAbsenceObservations: $this->previousAbsenceObservations(
                 $context->priorObservations(),
                 $locator,
-                $command->draft,
+                $draft,
             ),
         );
         $observedAt = $context->observationStartedAt();
@@ -96,6 +100,29 @@ final readonly class InvoiceReconciliationEngine
         );
 
         return $this->authoritativeOutcome($outcome);
+    }
+
+    /** @return array{draft: InvoiceDraft, identity: RemoteInvoiceIdentity} */
+    private function reconciliationPayload(
+        AuthoritativeReconciliationContext $context,
+    ): array {
+        $payload = $context->payload();
+        $command = match ($payload->values['write_activation_slot'] ?? null) {
+            IssueInvoicePayloadCodec::WriteActivationSlot => (new IssueInvoicePayloadCodec)->decode($payload),
+            IssueProformaPayloadCodec::WriteActivationSlot => (new IssueProformaPayloadCodec)->decode($payload),
+            default => throw new InvalidArgumentException('Invoice reconciliation payload activation slot is unsupported.'),
+        };
+
+        return match (true) {
+            $command instanceof IssueInvoiceCommand => [
+                'draft' => $command->draft,
+                'identity' => $command->identity,
+            ],
+            $command instanceof IssueProformaCommand => [
+                'draft' => $command->draft->toInvoiceDraft(),
+                'identity' => $command->identity,
+            ],
+        };
     }
 
     private function hardDeny(

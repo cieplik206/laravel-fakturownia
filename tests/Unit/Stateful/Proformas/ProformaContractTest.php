@@ -9,15 +9,87 @@ use Cieplik206\Fakturownia\Stateful\Invoices\InvoiceBuyer;
 use Cieplik206\Fakturownia\Stateful\Invoices\InvoiceLine;
 use Cieplik206\Fakturownia\Stateful\Invoices\Money;
 use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceCommand;
+use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceOperationFailure;
+use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceResult;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\DisabledIssueProformaTransport;
 use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaCommand;
 use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaOperationFactory;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaOperationHandler;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaOutcomeProjectionPlanner;
 use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaPayloadCodec;
 use Cieplik206\Fakturownia\Stateful\Proformas\ProformaDraft;
 use Cieplik206\Fakturownia\Stateful\Proformas\ProformaRequestPayload;
 use Cieplik206\Fakturownia\Stateful\Proformas\ProformaRequestPayloadMapper;
+use Cieplik206\Fakturownia\Stateful\Resources\InvoiceResourceProjectionPlan;
+use Cieplik206\Fakturownia\Stateful\Resources\IssueProformaResourceProjectionMapper;
+use Cieplik206\Fakturownia\Tests\Support\Stateful\InvoiceFixtures;
 use Cieplik206\IntegrationOperations\Context\IntegrationContext;
+use Cieplik206\IntegrationOperations\Contracts\EffectBoundary;
+use Cieplik206\IntegrationOperations\Contracts\OperationExecution;
 use Cieplik206\IntegrationOperations\Crypto\CanonicalObject;
+use Cieplik206\IntegrationOperations\Enums\EffectState;
+use Cieplik206\IntegrationOperations\Enums\OperationStatus;
+use Cieplik206\IntegrationOperations\Enums\ResultAvailability;
+use Cieplik206\IntegrationOperations\Enums\TerminalProofKind;
+use Cieplik206\IntegrationOperations\Registry\TerminalOutcomePair;
 use Cieplik206\IntegrationOperations\ValueObjects\ConnectionKey;
+use Cieplik206\IntegrationOperations\ValueObjects\IntegrationScope;
+use Cieplik206\IntegrationOperations\ValueObjects\OperationId;
+use Cieplik206\IntegrationOperations\ValueObjects\OperationType;
+use Cieplik206\IntegrationOperations\ValueObjects\ProjectionInput;
+
+final class S82EffectBoundary implements EffectBoundary
+{
+    public int $openCalls = 0;
+
+    public function open(): void
+    {
+        $this->openCalls++;
+    }
+
+    public function wasOpened(): bool
+    {
+        return $this->openCalls > 0;
+    }
+}
+
+final readonly class S82ProformaExecution implements OperationExecution
+{
+    public function __construct(
+        private CanonicalObject $canonicalPayload,
+        private S82EffectBoundary $boundary,
+    ) {}
+
+    public function operationId(): OperationId
+    {
+        return new OperationId('01K3K8N8G8V3A6R5T4Y2W1Q9P8');
+    }
+
+    public function scope(): IntegrationScope
+    {
+        return IntegrationScope::of('fakturownia', 'sales');
+    }
+
+    public function operationType(): OperationType
+    {
+        return new OperationType(IssueProformaOperationFactory::OperationType);
+    }
+
+    public function context(): IntegrationContext
+    {
+        return IntegrationContext::make(correlationId: 'workflow:proforma:123');
+    }
+
+    public function payload(): CanonicalObject
+    {
+        return $this->canonicalPayload;
+    }
+
+    public function effectBoundary(): EffectBoundary
+    {
+        return $this->boundary;
+    }
+}
 
 it('maps a fixed-kind unpaid proforma to the synthetic credential-free contract fixture', function (): void {
     $fixture = s82ProformaRequestFixture();
@@ -90,13 +162,9 @@ it('enforces the canonical plaintext body limit before any transport exists', fu
         ->toThrow(InvalidArgumentException::class, 'plaintext byte limit');
 });
 
-it('builds a separate fail-closed managed proforma intent without enabling remote execution', function (): void {
+it('builds a separate fail-closed managed proforma intent without registering remote execution', function (): void {
     $draft = s82ProformaDraft();
-    $identity = RemoteInvoiceIdentity::businessOid(
-        new RemoteIdentityScope(new ConnectionKey('sales'), 'proforma', '376237'),
-        'PROFORMA-123',
-        OidUniquenessGate::notPassed(),
-    );
+    $identity = s82ProformaIdentity();
     $command = new IssueProformaCommand($draft, $identity);
     $codec = new IssueProformaPayloadCodec;
     $payload = $codec->encode($command);
@@ -123,7 +191,7 @@ it('builds a separate fail-closed managed proforma intent without enabling remot
         ->toThrow(InvalidArgumentException::class);
 });
 
-it('contains no proforma transport or operation definition registration surface', function (): void {
+it('keeps the proforma runtime unregistered and fail-closed before its live gate', function (): void {
     $directory = dirname(__DIR__, 4).'/src/Stateful/Proformas';
     $source = '';
 
@@ -139,9 +207,68 @@ it('contains no proforma transport or operation definition registration surface'
         ->not->toContain('->send(')
         ->not->toContain('Connector')
         ->not->toContain('OperationDefinitionProvider')
-        ->not->toContain('OperationHandler')
-        ->not->toContain('IssueInvoiceTransport')
-        ->not->toContain('oid_unique');
+        ->toContain('OperationHandler')
+        ->toContain('IssueProformaTransport');
+
+    $identity = s82ProformaIdentity();
+    $command = new IssueProformaCommand(s82ProformaDraft(), $identity);
+    $payload = (new ProformaRequestPayloadMapper)->map($command->draft, $identity);
+    $body = $payload->bodyWithoutCredentials()['invoice'];
+    $boundary = new S82EffectBoundary;
+    $execution = new S82ProformaExecution(
+        (new IssueProformaPayloadCodec)->encode($command),
+        $boundary,
+    );
+
+    expect($body['oid'] ?? null)->toBe('PROFORMA-123')
+        ->and($body)->not->toHaveKey('oid_unique')
+        ->and(fn () => (new IssueProformaOperationHandler(
+            new DisabledIssueProformaTransport,
+        ))->execute($execution))
+        ->toThrow(
+            IssueInvoiceOperationFailure::class,
+            'not enabled by reviewed live evidence',
+        )
+        ->and($boundary->openCalls)->toBe(0);
+});
+
+it('prepares a typed proforma resource projection without registering the write', function (): void {
+    $draft = s82ProformaDraft();
+    $command = new IssueProformaCommand($draft, s82ProformaIdentity());
+    $operation = new S82ProformaExecution(
+        (new IssueProformaPayloadCodec)->encode($command),
+        new S82EffectBoundary,
+    );
+    $result = new IssueInvoiceResult(
+        remoteId: '900123',
+        number: 'PRO/2026/08/123',
+        kind: 'proforma',
+        status: 'issued',
+        issueDate: $draft->issueDate,
+        buyerTaxNumber: $draft->buyer->taxNumber,
+        totalGross: Money::fromDecimal('100.00', 'PLN'),
+        oid: 'PROFORMA-123',
+        positions: $draft->positions,
+    );
+    $projection = (new IssueProformaResourceProjectionMapper(InvoiceFixtures::hmac()))
+        ->map($operation, $result);
+    $plan = (new IssueProformaOutcomeProjectionPlanner)->plan(new ProjectionInput(
+        $operation,
+        $result,
+        new TerminalOutcomePair(
+            OperationStatus::Succeeded,
+            EffectState::Applied,
+            ResultAvailability::Available,
+            [TerminalProofKind::Execute],
+        ),
+    ));
+
+    expect($projection->connectionKey->value)->toBe('sales')
+        ->and($projection->localReferenceType)->toBe('transaction_order')
+        ->and($projection->snapshot)->toBe($result)
+        ->and($plan->schemaVersion)->toBe(InvoiceResourceProjectionPlan::SchemaVersion)
+        ->and($plan->mutations)->toHaveCount(1)
+        ->and($plan->mutations[0]->targetId)->toBe(InvoiceResourceProjectionPlan::TargetId);
 });
 
 /**
@@ -183,6 +310,15 @@ function s82ProformaDraft(
                 quantity: '1',
             ),
         ],
+    );
+}
+
+function s82ProformaIdentity(): RemoteInvoiceIdentity
+{
+    return RemoteInvoiceIdentity::businessOid(
+        new RemoteIdentityScope(new ConnectionKey('sales'), 'proforma', '376237'),
+        'PROFORMA-123',
+        OidUniquenessGate::notPassed(),
     );
 }
 

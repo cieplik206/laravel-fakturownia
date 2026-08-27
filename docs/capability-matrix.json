@@ -351,7 +351,7 @@
             "recovery": {"safe_retry": "disabled_until_capability_gate", "reconciliation": "not_frozen"},
             "policy": {"ownership": "pms_separate_proforma_owner_fence", "validation": "standard_invoice_profile", "profile": "rt8_proforma_fail_closed"},
             "live_evidence": {"required": true, "status": "deferred", "requirements": ["proforma_identity_scope", "single_effect_timeout_reconciliation"], "artifacts": []},
-            "limitations": ["The command, canonical codec and unregistered intent factory are implemented offline", "The operation type is not registered by the service provider and therefore cannot be accepted or executed", "VAT identity evidence cannot be reused without a proforma-specific gate"],
+            "limitations": ["The command, canonical codec, unregistered intent factory, fail-closed handler, reconciliation and projection are implemented offline", "The operation type is not registered by the service provider and therefore cannot be accepted or executed", "The default transport is disabled and cannot open the effect boundary", "VAT identity evidence cannot be reused without a proforma-specific gate"],
             "blocks_vat_pilot": false
         },
         {

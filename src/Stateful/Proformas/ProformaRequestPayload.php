@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Cieplik206\Fakturownia\Stateful\Proformas;
 
+use Cieplik206\Fakturownia\Stateful\Invoices\Identity\RemoteInvoiceIdentity;
 use Cieplik206\Fakturownia\Stateful\Invoices\InvoiceDraftValidator;
 use Cieplik206\Fakturownia\Stateful\Invoices\InvoiceLine;
 use Cieplik206\Fakturownia\Stateful\Invoices\InvoiceValidationProfile;
@@ -35,8 +36,10 @@ final readonly class ProformaRequestPayload
         }
     }
 
-    public static function fromDraft(ProformaDraft $draft): self
-    {
+    public static function fromDraft(
+        ProformaDraft $draft,
+        ?RemoteInvoiceIdentity $identity = null,
+    ): self {
         $draft = new ProformaDraft(
             sellDate: $draft->sellDate,
             issueDate: $draft->issueDate,
@@ -54,7 +57,13 @@ final readonly class ProformaRequestPayload
             ->validate($invoice, InvoiceValidationProfile::Standard)
             ->throwIfInvalid();
 
-        return new self([
+        if ($identity !== null
+            && ($identity->scope->documentKind !== 'proforma'
+                || $identity->scope->departmentId !== $draft->departmentId)) {
+            throw new InvalidArgumentException('Remote identity scope does not match the proforma draft.');
+        }
+
+        $proforma = [
             'kind' => 'proforma',
             'income' => '1',
             'sell_date' => $draft->sellDate,
@@ -89,7 +98,18 @@ final readonly class ProformaRequestPayload
             'buyer_tax_no_kind' => $draft->buyer->taxNumberKind,
             'buyer_first_name' => $draft->buyer->firstName,
             'number' => $draft->number,
-        ]);
+        ];
+        $oid = $identity?->oid();
+
+        if ($oid !== null) {
+            $proforma['oid'] = $oid;
+        }
+
+        if ($identity?->usesOidUnique() === true) {
+            $proforma['oid_unique'] = 'yes';
+        }
+
+        return new self($proforma);
     }
 
     /** @return array{placement: string, field: string} */

@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace Cieplik206\Fakturownia\Stateful\Resources;
 
+use Cieplik206\Fakturownia\Stateful\Invoices\Identity\RemoteInvoiceIdentity;
 use Cieplik206\Fakturownia\Stateful\Invoices\InvoiceDraft;
 use Cieplik206\Fakturownia\Stateful\Invoices\InvoiceLine;
+use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceCommand;
 use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoicePayloadCodec;
 use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceResult;
 use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceResultCodec;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaCommand;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaOperationFactory;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaPayloadCodec;
 use Cieplik206\IntegrationOperations\Contracts\OperationResult;
 use Cieplik206\IntegrationOperations\Contracts\OperationView;
 use Cieplik206\IntegrationOperations\Crypto\HmacSha256;
@@ -27,23 +32,26 @@ final readonly class IssueInvoiceResourceProjectionMapper
     {
         if (! $result instanceof IssueInvoiceResult
             || $operation->scope()->provider->value !== 'fakturownia'
-            || $operation->operationType()->value !== self::OperationType) {
+            || ! in_array($operation->operationType()->value, [
+                self::OperationType,
+                IssueProformaOperationFactory::OperationType,
+            ], true)) {
             throw new InvalidArgumentException('Issue invoice resource projection received an unsupported operation or result.');
         }
 
-        $command = (new IssueInvoicePayloadCodec)->decode($operation->payload());
+        ['draft' => $draft, 'identity' => $identity] = $this->projectionPayload($operation);
 
-        if (! $command->identity->scope->connection->equals($operation->scope()->connection)) {
+        if (! $identity->scope->connection->equals($operation->scope()->connection)) {
             throw new InvalidArgumentException('Issue invoice resource projection scope does not match its canonical payload.');
         }
 
-        $localReference = $command->identity->transactionOrderReference();
+        $localReference = $identity->transactionOrderReference();
 
         if ($localReference === null) {
             throw new InvalidArgumentException('Issue invoice resource projection requires a transaction-order reference.');
         }
 
-        $this->assertResultMatchesDraft($command->draft, $command->identity->oid(), $result);
+        $this->assertResultMatchesDraft($draft, $identity->oid(), $result);
         $localLookup = InvoiceResourceLocalLookup::forTransactionOrder($this->hmac, $localReference);
         $encodedResult = (new IssueInvoiceResultCodec)->encode($result);
         $snapshotFingerprint = $this->hmac->digestCanonical(LookupHmacDomain::Payload, [
@@ -60,6 +68,28 @@ final readonly class IssueInvoiceResourceProjectionMapper
             snapshot: $result,
             snapshotFingerprint: $snapshotFingerprint,
         );
+    }
+
+    /** @return array{draft: InvoiceDraft, identity: RemoteInvoiceIdentity} */
+    private function projectionPayload(OperationView $operation): array
+    {
+        $payload = $operation->payload();
+        $command = match ($operation->operationType()->value) {
+            self::OperationType => (new IssueInvoicePayloadCodec)->decode($payload),
+            IssueProformaOperationFactory::OperationType => (new IssueProformaPayloadCodec)->decode($payload),
+            default => throw new InvalidArgumentException('Invoice resource projection operation type is unsupported.'),
+        };
+
+        return match (true) {
+            $command instanceof IssueInvoiceCommand => [
+                'draft' => $command->draft,
+                'identity' => $command->identity,
+            ],
+            $command instanceof IssueProformaCommand => [
+                'draft' => $command->draft->toInvoiceDraft(),
+                'identity' => $command->identity,
+            ],
+        };
     }
 
     private function assertResultMatchesDraft(
