@@ -72,6 +72,10 @@ defines the current fail-closed launcher boundary, offline provisioning, and the
 future N/N-1 supervisor/broker deployment procedure. It is a safety contract,
 not an active live invocation path.
 
+The [compatibility, upgrade, deployment, and SLA policy](docs/compatibility-upgrade-and-sla.md)
+defines the supported `0.3.x` matrix, cross-repository release order, N/N-1
+rollback contract, and the guarantees that consumers may rely on.
+
 ## Invoice identity contract probe
 
 `composer test` is fully offline and excludes the `live` and `postgres` groups;
