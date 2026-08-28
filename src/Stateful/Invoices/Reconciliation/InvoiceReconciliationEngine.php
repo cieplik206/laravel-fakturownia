@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Cieplik206\Fakturownia\Stateful\Invoices\Reconciliation;
 
+use Cieplik206\Fakturownia\Stateful\Costs\Operations\IssueCostInvoiceCommand;
+use Cieplik206\Fakturownia\Stateful\Costs\Operations\IssueCostInvoicePayloadCodec;
 use Cieplik206\Fakturownia\Stateful\FakturowniaManager;
 use Cieplik206\Fakturownia\Stateful\Invoices\Identity\ExactOidLocator;
 use Cieplik206\Fakturownia\Stateful\Invoices\Identity\InvoiceFingerprint;
@@ -108,12 +110,17 @@ final readonly class InvoiceReconciliationEngine
     ): array {
         $payload = $context->payload();
         $command = match ($payload->values['write_activation_slot'] ?? null) {
+            IssueCostInvoicePayloadCodec::WriteActivationSlot => (new IssueCostInvoicePayloadCodec)->decode($payload),
             IssueInvoicePayloadCodec::WriteActivationSlot => (new IssueInvoicePayloadCodec)->decode($payload),
             IssueProformaPayloadCodec::WriteActivationSlot => (new IssueProformaPayloadCodec)->decode($payload),
             default => throw new InvalidArgumentException('Invoice reconciliation payload activation slot is unsupported.'),
         };
 
         return match (true) {
+            $command instanceof IssueCostInvoiceCommand => [
+                'draft' => $command->draft,
+                'identity' => $command->identity,
+            ],
             $command instanceof IssueInvoiceCommand => [
                 'draft' => $command->draft,
                 'identity' => $command->identity,

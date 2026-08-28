@@ -23,6 +23,8 @@ final readonly class InvoiceResource
 
     public const string CorrectionLocalReferenceType = 'customer_return';
 
+    public const string CostLocalReferenceType = 'cost_invoice';
+
     public function __construct(
         public InvoiceResourceId $id,
         public ConnectionKey $connectionKey,
@@ -74,7 +76,7 @@ final readonly class InvoiceResource
     /** @return non-empty-list<string> */
     public static function localReferenceTypes(): array
     {
-        return [self::LocalReferenceType, self::CorrectionLocalReferenceType];
+        return [self::LocalReferenceType, self::CorrectionLocalReferenceType, self::CostLocalReferenceType];
     }
 
     /** @return array{resource_type: string, connection: string, remote_id: string, local_reference: string, snapshot: string} */

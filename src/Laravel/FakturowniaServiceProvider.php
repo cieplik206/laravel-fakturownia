@@ -62,6 +62,43 @@ use Cieplik206\Fakturownia\Stateful\Corrections\Operations\IssueCorrectionPayloa
 use Cieplik206\Fakturownia\Stateful\Corrections\Operations\IssueCorrectionReconciliationStrategy;
 use Cieplik206\Fakturownia\Stateful\Corrections\Operations\IssueCorrectionResultCodec;
 use Cieplik206\Fakturownia\Stateful\Corrections\Operations\IssueCorrectionRetryPolicy;
+use Cieplik206\Fakturownia\Stateful\Costs\Delete\AuthoritativeDeleteCostInvoiceFailureClassifier;
+use Cieplik206\Fakturownia\Stateful\Costs\Delete\AuthoritativeDeleteCostInvoiceOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Costs\Delete\AuthoritativeDeleteCostInvoiceReconciliationStrategy;
+use Cieplik206\Fakturownia\Stateful\Costs\Delete\AuthoritativeDeleteCostInvoiceRetryPolicy;
+use Cieplik206\Fakturownia\Stateful\Costs\Delete\Contracts\DeleteCostInvoiceTransport;
+use Cieplik206\Fakturownia\Stateful\Costs\Delete\DeleteCostInvoiceFailureClassifier;
+use Cieplik206\Fakturownia\Stateful\Costs\Delete\DeleteCostInvoiceOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Costs\Delete\DeleteCostInvoiceOperationFactory;
+use Cieplik206\Fakturownia\Stateful\Costs\Delete\DeleteCostInvoiceOperationHandler;
+use Cieplik206\Fakturownia\Stateful\Costs\Delete\DeleteCostInvoiceOutcomeProjectionPlanner;
+use Cieplik206\Fakturownia\Stateful\Costs\Delete\DeleteCostInvoiceOutcomeProjector;
+use Cieplik206\Fakturownia\Stateful\Costs\Delete\DeleteCostInvoicePayloadCodec;
+use Cieplik206\Fakturownia\Stateful\Costs\Delete\DeleteCostInvoiceReconciliationStrategy;
+use Cieplik206\Fakturownia\Stateful\Costs\Delete\DeleteCostInvoiceResultCodec;
+use Cieplik206\Fakturownia\Stateful\Costs\Delete\DeleteCostInvoiceRetryPolicy;
+use Cieplik206\Fakturownia\Stateful\Costs\Delete\DisabledDeleteCostInvoiceTransport;
+use Cieplik206\Fakturownia\Stateful\Costs\Operations\AuthoritativeIssueCostInvoiceOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Costs\Operations\Contracts\IssueCostInvoiceTransport;
+use Cieplik206\Fakturownia\Stateful\Costs\Operations\DisabledIssueCostInvoiceTransport;
+use Cieplik206\Fakturownia\Stateful\Costs\Operations\IssueCostInvoiceOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Costs\Operations\IssueCostInvoiceOperationFactory;
+use Cieplik206\Fakturownia\Stateful\Costs\Operations\IssueCostInvoiceOperationHandler;
+use Cieplik206\Fakturownia\Stateful\Costs\Operations\IssueCostInvoiceOutcomeProjectionPlanner;
+use Cieplik206\Fakturownia\Stateful\Costs\Operations\IssueCostInvoiceOutcomeProjector;
+use Cieplik206\Fakturownia\Stateful\Costs\Operations\IssueCostInvoicePayloadCodec;
+use Cieplik206\Fakturownia\Stateful\Costs\Status\AuthoritativeChangeCostInvoiceStatusOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Costs\Status\AuthoritativeChangeCostInvoiceStatusReconciliationStrategy;
+use Cieplik206\Fakturownia\Stateful\Costs\Status\ChangeCostInvoiceStatusOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Costs\Status\ChangeCostInvoiceStatusOperationFactory;
+use Cieplik206\Fakturownia\Stateful\Costs\Status\ChangeCostInvoiceStatusOperationHandler;
+use Cieplik206\Fakturownia\Stateful\Costs\Status\ChangeCostInvoiceStatusOutcomeProjectionPlanner;
+use Cieplik206\Fakturownia\Stateful\Costs\Status\ChangeCostInvoiceStatusOutcomeProjector;
+use Cieplik206\Fakturownia\Stateful\Costs\Status\ChangeCostInvoiceStatusPayloadCodec;
+use Cieplik206\Fakturownia\Stateful\Costs\Status\ChangeCostInvoiceStatusReconciliationStrategy;
+use Cieplik206\Fakturownia\Stateful\Costs\Status\ChangeCostInvoiceStatusResultCodec;
+use Cieplik206\Fakturownia\Stateful\Costs\Status\Contracts\ChangeCostInvoiceStatusTransport;
+use Cieplik206\Fakturownia\Stateful\Costs\Status\DisabledChangeCostInvoiceStatusTransport;
 use Cieplik206\Fakturownia\Stateful\Diagnostics\FakturowniaDiagnosticDefinitionProvider;
 use Cieplik206\Fakturownia\Stateful\Diagnostics\FakturowniaDiagnosticProviderExtensions;
 use Cieplik206\Fakturownia\Stateful\FakturowniaManager;
@@ -120,6 +157,7 @@ use Cieplik206\Fakturownia\Stateful\Proformas\Reconciliation\IssueProformaReconc
 use Cieplik206\Fakturownia\Stateful\Resources\Contracts\InvoiceResourceProjectionStore;
 use Cieplik206\Fakturownia\Stateful\Resources\Contracts\InvoiceResourceReader;
 use Cieplik206\Fakturownia\Stateful\Resources\Contracts\InvoiceResourceSnapshotProtector;
+use Cieplik206\Fakturownia\Stateful\Resources\IssueCostInvoiceResourceProjectionMapper;
 use Cieplik206\Fakturownia\Stateful\Resources\IssueInvoiceResourceProjectionMapper;
 use Cieplik206\Fakturownia\Stateful\Resources\IssueProformaResourceProjectionMapper;
 use Cieplik206\IntegrationOperations\Events\OperationTerminalized;
@@ -170,6 +208,44 @@ final class FakturowniaServiceProvider extends ServiceProvider
         $this->app->singleton(IssueInvoiceResourceProjectionMapper::class);
         $this->app->singleton(DisabledIssueInvoiceTransport::class);
         $this->app->alias(DisabledIssueInvoiceTransport::class, IssueInvoiceTransport::class);
+
+        $this->app->singleton(IssueCostInvoicePayloadCodec::class);
+        $this->app->singleton(IssueCostInvoiceOperationFactory::class);
+        $this->app->singleton(IssueCostInvoiceOperationHandler::class);
+        $this->app->singleton(IssueCostInvoiceOutcomeProjector::class);
+        $this->app->singleton(IssueCostInvoiceOutcomeProjectionPlanner::class);
+        $this->app->singleton(IssueCostInvoiceResourceProjectionMapper::class);
+        $this->app->singleton(DisabledIssueCostInvoiceTransport::class);
+        $this->app->alias(DisabledIssueCostInvoiceTransport::class, IssueCostInvoiceTransport::class);
+
+        $this->app->singleton(ChangeCostInvoiceStatusPayloadCodec::class);
+        $this->app->singleton(ChangeCostInvoiceStatusOperationFactory::class);
+        $this->app->singleton(ChangeCostInvoiceStatusOperationHandler::class);
+        $this->app->singleton(ChangeCostInvoiceStatusReconciliationStrategy::class);
+        $this->app->singleton(AuthoritativeChangeCostInvoiceStatusReconciliationStrategy::class);
+        $this->app->singleton(ChangeCostInvoiceStatusResultCodec::class);
+        $this->app->singleton(ChangeCostInvoiceStatusOutcomeProjector::class);
+        $this->app->singleton(ChangeCostInvoiceStatusOutcomeProjectionPlanner::class);
+        $this->app->singleton(DisabledChangeCostInvoiceStatusTransport::class);
+        $this->app->alias(
+            DisabledChangeCostInvoiceStatusTransport::class,
+            ChangeCostInvoiceStatusTransport::class,
+        );
+
+        $this->app->singleton(DeleteCostInvoicePayloadCodec::class);
+        $this->app->singleton(DeleteCostInvoiceOperationFactory::class);
+        $this->app->singleton(DeleteCostInvoiceOperationHandler::class);
+        $this->app->singleton(DeleteCostInvoiceFailureClassifier::class);
+        $this->app->singleton(AuthoritativeDeleteCostInvoiceFailureClassifier::class);
+        $this->app->singleton(DeleteCostInvoiceRetryPolicy::class);
+        $this->app->singleton(AuthoritativeDeleteCostInvoiceRetryPolicy::class);
+        $this->app->singleton(DeleteCostInvoiceReconciliationStrategy::class);
+        $this->app->singleton(AuthoritativeDeleteCostInvoiceReconciliationStrategy::class);
+        $this->app->singleton(DeleteCostInvoiceResultCodec::class);
+        $this->app->singleton(DeleteCostInvoiceOutcomeProjector::class);
+        $this->app->singleton(DeleteCostInvoiceOutcomeProjectionPlanner::class);
+        $this->app->singleton(DisabledDeleteCostInvoiceTransport::class);
+        $this->app->alias(DisabledDeleteCostInvoiceTransport::class, DeleteCostInvoiceTransport::class);
 
         $this->app->singleton(IssueProformaPayloadCodec::class);
         $this->app->singleton(IssueProformaOperationFactory::class);
@@ -275,6 +351,16 @@ final class FakturowniaServiceProvider extends ServiceProvider
         $operations->registerProvider(FakturowniaDiagnosticDefinitionProvider::class);
         $operations->registerProvider(IssueInvoiceOperationDefinitionProvider::class);
         $operations->registerAuthoritativeProvider(AuthoritativeIssueInvoiceOperationDefinitionProvider::class);
+        $operations->registerProvider(IssueCostInvoiceOperationDefinitionProvider::class);
+        $operations->registerAuthoritativeProvider(AuthoritativeIssueCostInvoiceOperationDefinitionProvider::class);
+        $operations->registerProvider(ChangeCostInvoiceStatusOperationDefinitionProvider::class);
+        $operations->registerAuthoritativeProvider(
+            AuthoritativeChangeCostInvoiceStatusOperationDefinitionProvider::class,
+        );
+        $operations->registerProvider(DeleteCostInvoiceOperationDefinitionProvider::class);
+        $operations->registerAuthoritativeProvider(
+            AuthoritativeDeleteCostInvoiceOperationDefinitionProvider::class,
+        );
         $operations->registerProvider(IssueProformaOperationDefinitionProvider::class);
         $operations->registerAuthoritativeProvider(AuthoritativeIssueProformaOperationDefinitionProvider::class);
         $operations->registerProvider(IssueCorrectionOperationDefinitionProvider::class);

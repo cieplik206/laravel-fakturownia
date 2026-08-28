@@ -9,6 +9,9 @@ use Cieplik206\Fakturownia\Stateful\Artifacts\Maintenance\Contracts\ArtifactMain
 use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\DownloadInvoicePdfOperationDefinitionProvider;
 use Cieplik206\Fakturownia\Stateful\Contracts\ConnectionResolver;
 use Cieplik206\Fakturownia\Stateful\Corrections\Operations\IssueCorrectionOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Costs\Delete\DeleteCostInvoiceOperationFactory;
+use Cieplik206\Fakturownia\Stateful\Costs\Operations\IssueCostInvoiceOperationFactory;
+use Cieplik206\Fakturownia\Stateful\Costs\Status\ChangeCostInvoiceStatusOperationFactory;
 use Cieplik206\Fakturownia\Stateful\Diagnostics\FakturowniaDiagnosticDefinitionProvider;
 use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceOperationDefinitionProvider;
 use Cieplik206\Fakturownia\Stateful\Ksef\Operations\EnsureAcceptedOperationDefinitionProvider;
@@ -95,6 +98,9 @@ final class DoctorFakturowniaCommand extends Command
             IssueCorrectionOperationDefinitionProvider::OperationType,
             EnsureAcceptedOperationDefinitionProvider::OperationType,
             DownloadInvoicePdfOperationDefinitionProvider::OperationType,
+            IssueCostInvoiceOperationFactory::OperationType,
+            ChangeCostInvoiceStatusOperationFactory::OperationType,
+            DeleteCostInvoiceOperationFactory::OperationType,
         ];
         $operationTypes = [
             FakturowniaDiagnosticDefinitionProvider::OperationType,

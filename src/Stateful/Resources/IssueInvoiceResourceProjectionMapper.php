@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Cieplik206\Fakturownia\Stateful\Resources;
 
+use Cieplik206\Fakturownia\Stateful\Costs\Operations\IssueCostInvoiceCommand;
+use Cieplik206\Fakturownia\Stateful\Costs\Operations\IssueCostInvoiceOperationFactory;
+use Cieplik206\Fakturownia\Stateful\Costs\Operations\IssueCostInvoicePayloadCodec;
 use Cieplik206\Fakturownia\Stateful\Invoices\Identity\RemoteInvoiceIdentity;
 use Cieplik206\Fakturownia\Stateful\Invoices\InvoiceDraft;
 use Cieplik206\Fakturownia\Stateful\Invoices\InvoiceLine;
@@ -34,6 +37,7 @@ final readonly class IssueInvoiceResourceProjectionMapper
             || $operation->scope()->provider->value !== 'fakturownia'
             || ! in_array($operation->operationType()->value, [
                 self::OperationType,
+                IssueCostInvoiceOperationFactory::OperationType,
                 IssueProformaOperationFactory::OperationType,
             ], true)) {
             throw new InvalidArgumentException('Issue invoice resource projection received an unsupported operation or result.');
@@ -52,7 +56,9 @@ final readonly class IssueInvoiceResourceProjectionMapper
         }
 
         $this->assertResultMatchesDraft($draft, $identity->oid(), $result);
-        $localLookup = InvoiceResourceLocalLookup::forTransactionOrder($this->hmac, $localReference);
+        $localLookup = $operation->operationType()->value === IssueCostInvoiceOperationFactory::OperationType
+            ? InvoiceResourceLocalLookup::forCostInvoice($this->hmac, $localReference)
+            : InvoiceResourceLocalLookup::forTransactionOrder($this->hmac, $localReference);
         $encodedResult = (new IssueInvoiceResultCodec)->encode($result);
         $snapshotFingerprint = $this->hmac->digestCanonical(LookupHmacDomain::Payload, [
             'protocol' => self::SnapshotFingerprintProtocol,
@@ -63,7 +69,7 @@ final readonly class IssueInvoiceResourceProjectionMapper
             resourceId: InvoiceResourceId::fromOperationId($operation->operationId()),
             connectionKey: $operation->scope()->connection,
             operationId: $operation->operationId(),
-            localReferenceType: InvoiceResource::LocalReferenceType,
+            localReferenceType: $localLookup->referenceType,
             localReferenceHmac: $localLookup->activeDigest,
             snapshot: $result,
             snapshotFingerprint: $snapshotFingerprint,
@@ -75,12 +81,17 @@ final readonly class IssueInvoiceResourceProjectionMapper
     {
         $payload = $operation->payload();
         $command = match ($operation->operationType()->value) {
+            IssueCostInvoiceOperationFactory::OperationType => (new IssueCostInvoicePayloadCodec)->decode($payload),
             self::OperationType => (new IssueInvoicePayloadCodec)->decode($payload),
             IssueProformaOperationFactory::OperationType => (new IssueProformaPayloadCodec)->decode($payload),
             default => throw new InvalidArgumentException('Invoice resource projection operation type is unsupported.'),
         };
 
         return match (true) {
+            $command instanceof IssueCostInvoiceCommand => [
+                'draft' => $command->draft,
+                'identity' => $command->identity,
+            ],
             $command instanceof IssueInvoiceCommand => [
                 'draft' => $command->draft,
                 'identity' => $command->identity,

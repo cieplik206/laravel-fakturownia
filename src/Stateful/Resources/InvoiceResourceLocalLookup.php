@@ -70,6 +70,11 @@ final readonly class InvoiceResourceLocalLookup
         return self::forReference($hmac, InvoiceResource::CorrectionLocalReferenceType, $reference);
     }
 
+    public static function forCostInvoice(HmacSha256 $hmac, string $reference): self
+    {
+        return self::forReference($hmac, InvoiceResource::CostLocalReferenceType, $reference);
+    }
+
     private static function forReference(HmacSha256 $hmac, string $referenceType, string $reference): self
     {
         self::assertReference($reference);

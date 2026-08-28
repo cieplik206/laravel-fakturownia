@@ -11,6 +11,21 @@ use Cieplik206\Fakturownia\Stateful\Artifacts\Maintenance\ArtifactPurgePermitVer
 use Cieplik206\Fakturownia\Stateful\Artifacts\Maintenance\Contracts\ArtifactMaintenanceStore;
 use Cieplik206\Fakturownia\Stateful\Artifacts\Maintenance\Contracts\ArtifactMaintenanceStoreFactory;
 use Cieplik206\Fakturownia\Stateful\Contracts\ConnectionResolver;
+use Cieplik206\Fakturownia\Stateful\Costs\Delete\AuthoritativeDeleteCostInvoiceOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Costs\Delete\Contracts\DeleteCostInvoiceTransport;
+use Cieplik206\Fakturownia\Stateful\Costs\Delete\DeleteCostInvoiceOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Costs\Delete\DeleteCostInvoiceOperationFactory;
+use Cieplik206\Fakturownia\Stateful\Costs\Delete\DisabledDeleteCostInvoiceTransport;
+use Cieplik206\Fakturownia\Stateful\Costs\Operations\AuthoritativeIssueCostInvoiceOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Costs\Operations\Contracts\IssueCostInvoiceTransport;
+use Cieplik206\Fakturownia\Stateful\Costs\Operations\DisabledIssueCostInvoiceTransport;
+use Cieplik206\Fakturownia\Stateful\Costs\Operations\IssueCostInvoiceOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Costs\Operations\IssueCostInvoiceOperationFactory;
+use Cieplik206\Fakturownia\Stateful\Costs\Status\AuthoritativeChangeCostInvoiceStatusOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Costs\Status\ChangeCostInvoiceStatusOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Costs\Status\ChangeCostInvoiceStatusOperationFactory;
+use Cieplik206\Fakturownia\Stateful\Costs\Status\Contracts\ChangeCostInvoiceStatusTransport;
+use Cieplik206\Fakturownia\Stateful\Costs\Status\DisabledChangeCostInvoiceStatusTransport;
 use Cieplik206\Fakturownia\Stateful\Diagnostics\FakturowniaDiagnosticDefinitionProvider;
 use Cieplik206\Fakturownia\Stateful\Diagnostics\FakturowniaDiagnosticProviderExtensions;
 use Cieplik206\Fakturownia\Stateful\Exceptions\ConnectionConfigurationInvalid;
@@ -61,6 +76,44 @@ it('registers the proforma runtime with a fail-closed default transport', functi
         ))->not->toBeNull()
         ->and($this->app->make(IssueProformaTransport::class))
         ->toBeInstanceOf(DisabledIssueProformaTransport::class);
+});
+
+it('registers isolated cost mutation runtimes with fail-closed transports', function (): void {
+    $definitions = $this->app->make(DefinitionRegistry::class);
+    $authoritativeDefinitions = $this->app->make(AuthoritativeDefinitionRegistry::class);
+    $operations = [
+        [
+            IssueCostInvoiceOperationDefinitionProvider::provider(),
+            AuthoritativeIssueCostInvoiceOperationDefinitionProvider::provider(),
+            IssueCostInvoiceOperationFactory::OperationType,
+        ],
+        [
+            ChangeCostInvoiceStatusOperationDefinitionProvider::provider(),
+            AuthoritativeChangeCostInvoiceStatusOperationDefinitionProvider::provider(),
+            ChangeCostInvoiceStatusOperationFactory::OperationType,
+        ],
+        [
+            DeleteCostInvoiceOperationDefinitionProvider::provider(),
+            AuthoritativeDeleteCostInvoiceOperationDefinitionProvider::provider(),
+            DeleteCostInvoiceOperationFactory::OperationType,
+        ],
+    ];
+
+    foreach ($operations as [$provider, $authoritativeProvider, $operationType]) {
+        expect($definitions->find($provider, new OperationType($operationType), 1))->not->toBeNull()
+            ->and($authoritativeDefinitions->find(
+                $authoritativeProvider,
+                new OperationType($operationType),
+                1,
+            ))->not->toBeNull();
+    }
+
+    expect($this->app->make(IssueCostInvoiceTransport::class))
+        ->toBeInstanceOf(DisabledIssueCostInvoiceTransport::class)
+        ->and($this->app->make(ChangeCostInvoiceStatusTransport::class))
+        ->toBeInstanceOf(DisabledChangeCostInvoiceStatusTransport::class)
+        ->and($this->app->make(DeleteCostInvoiceTransport::class))
+        ->toBeInstanceOf(DisabledDeleteCostInvoiceTransport::class);
 });
 
 it('injects the shared scoped operation query into resolved connections', function (): void {
@@ -131,7 +184,7 @@ it('registers fail-closed provider and artifact maintenance diagnostics without 
     $maintenanceOutput = Artisan::output();
 
     expect($doctorExitCode)->toBe(1)
-        ->and($doctorOutput)->toContain('6 provider operation definitions and 5 authoritative definitions are frozen')
+        ->and($doctorOutput)->toContain('9 provider operation definitions and 8 authoritative definitions are frozen')
         ->and($doctorOutput)->toContain('capability-aware artifact maintenance store is not bound')
         ->and($doctorOutput)->not->toContain('doctor-secret-token')
         ->and($maintenanceExitCode)->toBe(2)

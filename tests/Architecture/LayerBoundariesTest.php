@@ -122,6 +122,9 @@ it('keeps the complete public and Saloon dispatch surface closed behind the RT-3
         ->and(publicMethodInventoryErrors($completeNonRemoteInventory))->toBe([])
         ->and(dynamicToolingCallSiteErrors($methodInventory))->toBe([])
         ->and($classificationCounts)->toBe([
+            'capability_contract:cost.invoice.create' => 22,
+            'capability_contract:cost.invoice.delete' => 35,
+            'capability_contract:cost.invoice.status.change' => 26,
             'capability_contract:invoice.correction.issue' => 64,
             'capability_contract:invoice.ksef.ensure_accepted' => 112,
             'capability_contract:invoice.pdf.download' => 253,
@@ -137,7 +140,7 @@ it('keeps the complete public and Saloon dispatch surface closed behind the RT-3
             'testing_no_io' => 48,
         ])
         ->and(hash_file('sha256', publicMethodInventoryPath()))
-        ->toBe('6b23544522f6117c125c635d18bb554d4a435055b5893bb69d91c8f8e07d3547');
+        ->toBe('2a443746a16dced513eddde08e8135a55d8aa2f710c6dcae588b2b7d9cb0f31b');
 
     $statuses = capabilityStatuses($matrix);
 
@@ -292,6 +295,9 @@ function publicMethodInventory(): array
 function publicMethodInventoryErrors(array $inventory): array
 {
     $allowedClassifications = [
+        'capability_contract:cost.invoice.create',
+        'capability_contract:cost.invoice.delete',
+        'capability_contract:cost.invoice.status.change',
         'capability_contract:invoice.correction.issue',
         'capability_contract:invoice.ksef.ensure_accepted',
         'capability_contract:invoice.pdf.download',
