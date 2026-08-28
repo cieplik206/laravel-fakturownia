@@ -6,6 +6,7 @@ namespace Cieplik206\Fakturownia\Tests\Contract\Support;
 
 use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\BrokeredExecutionRequiredException;
 use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\ConsumptionClaimRequest;
+use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\NativeBrokerSession;
 use Closure;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -88,7 +89,7 @@ use function trim;
 use function unlink;
 use function usleep;
 
-final class KsefDemoContractProbe implements LiveProviderTransportOrigin
+final class KsefDemoContractProbe implements NativeBrokerProviderTransportOrigin
 {
     private const int MinimumBoundedRequestStartBudgetNanoseconds = 1_000_000;
 
@@ -145,6 +146,18 @@ final class KsefDemoContractProbe implements LiveProviderTransportOrigin
         return new self($configuration, $fixtureDirectory, $inMemoryTransport, $clock, $verifyEffectAccountIdentity);
     }
 
+    public static function forNativeBrokerSession(
+        #[SensitiveParameter] NativeBrokerSession $session,
+        ?string $fixtureDirectory = null,
+    ): self {
+        KsefDemoSaloonRuntimeGuard::assertClean();
+
+        return new self(
+            KsefDemoProbeConfiguration::fromNativeBrokerSession($session),
+            $fixtureDirectory,
+        );
+    }
+
     /**
      * Production-adjacent offline seam. The sealed literal-response transport
      * has no fallback sender, fixture recorder, callable, filesystem, or network path.
@@ -196,7 +209,16 @@ final class KsefDemoContractProbe implements LiveProviderTransportOrigin
     {
         KsefDemoSaloonRuntimeGuard::assertClean();
 
-        throw new BrokeredExecutionRequiredException('brokered_effect_execution_unavailable');
+        if (! $this->configuration->usesNativeBroker() || $this->inMemoryTransport !== null) {
+            throw new BrokeredExecutionRequiredException('brokered_effect_execution_unavailable');
+        }
+    }
+
+    public function nativeBrokerSession(): NativeBrokerSession
+    {
+        $this->assertRealProviderTransportOrigin();
+
+        return $this->configuration->nativeBrokerSession();
     }
 
     /**
@@ -211,11 +233,80 @@ final class KsefDemoContractProbe implements LiveProviderTransportOrigin
     {
         KsefDemoSaloonRuntimeGuard::assertClean();
 
-        if ($this->inMemoryTransport !== null) {
-            throw new RuntimeException('An in-memory authority grant cannot publish canonical live KSeF evidence.');
-        }
+        $this->assertRealProviderTransportOrigin();
+        $session = $this->nativeBrokerSession();
+        $accountPreflights = $this->preflightAccounts();
+        $authorityObservedAt = $this->currentUtc();
+        $this->verifiedFreshClaimGrant = LiveEvidenceAttestationGuard::acceptNativeBrokerAuthority(
+            $session,
+            $authorityObservedAt,
+        );
+        $this->consumptionClaimRequest = $this->verifiedFreshClaimGrant->grant->receipt->envelope->claimRequest;
+        $providerRunHandle = LiveEvidenceAttestationGuard::beginLiveProviderRun(
+            $this,
+            KsefDemoProbeConfiguration::EvidenceContract,
+            'ksef_demo',
+        );
+        $providerRun = null;
 
-        throw new BrokeredExecutionRequiredException('brokered_effect_execution_unavailable');
+        try {
+            try {
+                $result = $this->collectAfterPreflight($authorityObservedAt, $accountPreflights);
+            } finally {
+                $providerRun = LiveEvidenceAttestationGuard::finishLiveProviderRun($providerRunHandle);
+            }
+
+            $runWindow = LiveEvidenceAttestationGuard::liveProviderRunWindow($providerRun);
+            $result['run'] = [
+                'started_at' => $runWindow['started_at'],
+                'finished_at' => $runWindow['finished_at'],
+                'environment' => $runWindow['environment'],
+                'launch_manifest_sha256' => $this->configuration->launchManifestSha256(),
+            ];
+            KsefDemoFixtureGuard::assertSafe($result, $this->sensitiveValues());
+            $path = $this->writeFixture($result);
+
+            try {
+                $relativePath = $this->relativeFixturePath($path);
+                $fixtureContents = \file_get_contents($path);
+
+                if (! is_string($fixtureContents)) {
+                    throw new RuntimeException('The published KSeF fixture cannot be read for evidence binding.');
+                }
+
+                $payload = $this->configuration->buildNativeUnsignedEvidencePayload(
+                    $this->repositoryRoot(),
+                    $relativePath,
+                    hash('sha256', $fixtureContents),
+                    $result,
+                    $providerRun,
+                    $this->verifiedFreshClaimGrant,
+                );
+                $published = $this->configuration->publishNativeUnsignedEvidenceSidecar(
+                    $this->repositoryRoot(),
+                    $payload,
+                    $providerRun,
+                    $this->verifiedFreshClaimGrant,
+                );
+
+                return [
+                    'path' => $path,
+                    'result' => $result,
+                    'unsigned_attestation_path' => $published['unsigned_path'],
+                    'unsigned_attestation_envelope' => $payload,
+                ];
+            } catch (Throwable $exception) {
+                if (is_file($path) && ! is_link($path)) {
+                    unlink($path);
+                }
+
+                throw $exception;
+            }
+        } finally {
+            $this->verifiedFreshClaimGrant = null;
+            $this->consumptionClaimRequest = null;
+            $this->configuration->destroyBindingKeys();
+        }
     }
 
     /**
@@ -1634,6 +1725,9 @@ final class KsefDemoContractProbe implements LiveProviderTransportOrigin
             $connectTimeoutMs,
             $requestTimeoutMs,
             $this->inMemoryTransport,
+            $this->configuration->usesNativeBroker()
+                ? $this->configuration->nativeBrokerSender()
+                : null,
         );
 
         return $connector;
@@ -1671,6 +1765,25 @@ final class KsefDemoContractProbe implements LiveProviderTransportOrigin
 
     private function assertWriteBoundaryAuthorized(#[SensitiveParameter] KsefDemoProfile $profile): void
     {
+        if ($this->configuration->usesNativeBroker()) {
+            if (! $this->verifiedFreshClaimGrant instanceof VerifiedFreshClaimGrant
+                || ! $this->consumptionClaimRequest instanceof ConsumptionClaimRequest) {
+                throw new RuntimeException('The native KSeF effect boundary has no verified authority grant.');
+            }
+
+            $now = $this->currentUtc();
+            $minimumRemainingSeconds = (int) ceil($this->configuration->requestTimeoutMs / 1_000);
+            $profile->assertWriteAuthorizedAt($now, $minimumRemainingSeconds);
+            LiveEvidenceAttestationGuard::assertNativeBrokerAuthorityAtEffectBoundary(
+                $this->verifiedFreshClaimGrant,
+                $this->configuration->nativeBrokerSession(),
+                $now,
+                $minimumRemainingSeconds,
+            );
+
+            return;
+        }
+
         if (! $this->testConsumptionAuthority instanceof LiveEvidenceConsumptionAuthority) {
             if ($this->inMemoryTransport === null) {
                 throw new RuntimeException('A fresh external consumption-authority grant is required at every KSeF effect boundary.');
@@ -2944,6 +3057,7 @@ final class KsefDemoConnector extends Connector
         int $connectTimeoutMs = KsefDemoProbeConfiguration::DefaultConnectTimeoutMs,
         int $requestTimeoutMs = KsefDemoProbeConfiguration::DefaultRequestTimeoutMs,
         ?KsefDemoInMemoryTransport $inMemoryTransport = null,
+        #[SensitiveParameter] ?NativeBrokerSaloonSender $nativeBrokerSender = null,
     ) {
         if ($connectTimeoutMs < 1 || $requestTimeoutMs < 1) {
             throw new RuntimeException('KSeF DEMO connector timeouts must be positive.');
@@ -2952,8 +3066,14 @@ final class KsefDemoConnector extends Connector
         $this->connectTimeout = $connectTimeoutMs / 1_000;
         $this->requestTimeout = $requestTimeoutMs / 1_000;
 
+        if ($inMemoryTransport instanceof KsefDemoInMemoryTransport && $nativeBrokerSender !== null) {
+            throw new InvalidArgumentException('A KSeF connector cannot mix native and in-memory transports.');
+        }
+
         if ($inMemoryTransport instanceof KsefDemoInMemoryTransport) {
             $this->sender = $inMemoryTransport;
+        } elseif ($nativeBrokerSender !== null) {
+            $this->sender = $nativeBrokerSender;
         }
     }
 

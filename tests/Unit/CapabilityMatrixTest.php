@@ -1165,31 +1165,42 @@ it('publishes the complete versioned fail-closed capability contract', function 
             'signed_sidecar_suffix' => '.attestation.json',
             'preautoload_trust_root' => [
                 'launcher_source_path' => 'bin/fakturownia-live-evidence-launcher.php',
-                'launcher_source_sha256' => '57594c7180eec5de8002030826f63828a70941ea8f6e844e6b888654770a536b',
+                'launcher_source_sha256' => '1db0b3837cbff3d156e566a12f3a57c0c9729ec17a515b4656b0f34e3153d93f',
                 'policy_contract' => 'cieplik206.fakturownia.preauthenticated-policy',
                 'manifest_contract' => 'cieplik206.fakturownia.preauthenticated-snapshot',
-                'version' => 2,
+                'version' => 3,
                 'production_launcher_path' => '/usr/local/libexec/cieplik206/fakturownia-live-evidence-launcher.php',
                 'policy_path' => '/etc/cieplik206/fakturownia-live-evidence/preautoload-policy.json',
                 'snapshot_root' => '/var/lib/cieplik206/fakturownia-live-evidence/snapshots',
-                'launch_manifest_handoff' => 'root_authenticated_af_unix_fd6',
-                'native_supervisor_status' => 'not_implemented_requires_explicit_user_approval',
+                'native_supervisor_crate_path' => 'native-broker/Cargo.toml',
+                'native_supervisor_semantics_path' => 'native-broker/supervisor-semantics-v1.json',
+                'native_supervisor_semantics_sha256' => '063386ef725cd5c0a38204cdb809a2ae73909e3c34b801098d6e82258f1a9dd1',
+                'required_linux_yama_ptrace_scope' => 3,
+                'launch_manifest_handoff' => 'private_anonymous_pipe_canonical_frame_v1',
+                'native_supervisor_status' => 'source_implemented_unprovisioned_requires_security_review',
                 'provider_credentials_in_php' => 'forbidden',
-                'status' => 'fail_closed_before_manifest_parse_or_secret_open',
+                'status' => 'fail_closed_without_compiled_signed_deployment',
             ],
             'brokered_effect_execution' => [
+                'probe_entrypoint' => 'tests/Contract/LiveEvidenceProbeEntrypoint.php',
                 'effect_descriptor_contract' => LiveEffectDescriptor::Contract,
                 'effect_descriptor_version' => LiveEffectDescriptor::Version,
+                'effect_execution_proposal_contract' => 'cieplik206.fakturownia.brokered-effect-execution-proposal',
+                'concurrent_effect_execution_contract' => 'cieplik206.fakturownia.concurrent-brokered-effect-execution-proposal',
+                'read_observation_contract' => 'cieplik206.fakturownia.brokered-read-observation-proposal',
+                'signed_execution_receipt_contract' => 'cieplik206.fakturownia.brokered-effect-execution-receipt',
                 'effect_descriptor_operations' => [
-                    ['evidence_contract' => 'fakturownia-invoice-identity-s0.3-v1', 'profiles' => ['invoice_identity'], 'capability' => 'invoice.vat.issue', 'semantic_effect' => 'invoice_create', 'http_method' => 'POST', 'endpoint_template' => '/invoices.json', 'request_body_policy' => 'required_non_empty', 'maximum_effect_sequence' => 11],
-                    ['evidence_contract' => 'fakturownia-ksef-demo-s0.4-v1', 'profiles' => ['explicit_block', 'explicit_persist', 'auto_block', 'auto_persist'], 'capability' => 'contract_probe.invoice.fixture.issue', 'semantic_effect' => 'probe_fixture_invoice_create', 'http_method' => 'POST', 'endpoint_template' => '/invoices.json', 'request_body_policy' => 'required_non_empty', 'maximum_effect_sequence' => 8],
-                    ['evidence_contract' => 'fakturownia-ksef-demo-s0.4-v1', 'profiles' => ['explicit_block', 'explicit_persist'], 'capability' => 'invoice.ksef.ensure_accepted', 'semantic_effect' => 'ksef_explicit_submit', 'http_method' => 'GET', 'endpoint_template' => '/invoices/{invoice_id}.json?send_to_ksef=yes', 'request_body_policy' => 'must_be_empty', 'maximum_effect_sequence' => 8],
+                    ['evidence_contract' => 'fakturownia-invoice-identity-s0.3-v1', 'profiles' => ['invoice_identity'], 'target_keys' => ['primary', 'secondary'], 'capability' => 'invoice.vat.issue', 'semantic_effect' => 'invoice_create', 'http_method' => 'POST', 'endpoint_template' => '/invoices.json', 'request_body_policy' => 'required_non_empty', 'maximum_effect_sequence' => 11],
+                    ['evidence_contract' => 'fakturownia-ksef-demo-s0.4-v1', 'profiles' => ['explicit_block', 'explicit_persist', 'auto_block', 'auto_persist'], 'target_key' => 'profile', 'capability' => 'contract_probe.invoice.fixture.issue', 'semantic_effect' => 'probe_fixture_invoice_create', 'http_method' => 'POST', 'endpoint_template' => '/invoices.json', 'request_body_policy' => 'required_non_empty', 'maximum_effect_sequence' => 8],
+                    ['evidence_contract' => 'fakturownia-ksef-demo-s0.4-v1', 'profiles' => ['explicit_block', 'explicit_persist'], 'target_key' => 'profile', 'capability' => 'invoice.ksef.ensure_accepted', 'semantic_effect' => 'ksef_explicit_submit', 'http_method' => 'GET', 'endpoint_template' => '/invoices/{invoice_id}.json?send_to_ksef=yes', 'request_body_policy' => 'must_be_empty', 'maximum_effect_sequence' => 8],
                 ],
-                'supervisor_attestation' => 'required_not_implemented',
+                'supervisor_attestation' => 'implemented_unprovisioned',
                 'authorization_cas' => 'root_broker_owned',
                 'provider_http' => 'root_broker_owned_one_shot',
                 'php_direct_provider_write' => 'forbidden',
                 'signed_execution_receipt' => 'required_for_canonical_live_evidence',
+                'historical_live_evidence_trust' => 'embedded_policy_requires_externally_pinned_policy_signer_public_key',
+                'source_implementation' => 'complete_offline_verified',
                 'status' => 'unprovisioned_fail_closed',
             ],
             'trusted_signer_store' => [
@@ -1215,6 +1226,8 @@ it('publishes the complete versioned fail-closed capability contract', function 
     $root = dirname(__DIR__, 2);
     $launcher = $matrix['attestation_policy']['preautoload_trust_root'];
     $launcherFile = readFakturowniaEvidenceFile($root, $launcher['launcher_source_path']);
+    $nativeCrate = readFakturowniaEvidenceFile($root, $launcher['native_supervisor_crate_path']);
+    $nativeSemantics = readFakturowniaEvidenceFile($root, $launcher['native_supervisor_semantics_path']);
     $signerStore = $matrix['attestation_policy']['trusted_signer_store'];
     $signerStoreFile = readFakturowniaEvidenceFile($root, $signerStore['path']);
     $authorityStore = $matrix['attestation_policy']['remote_authority_policy_store'];
@@ -1222,6 +1235,9 @@ it('publishes the complete versioned fail-closed capability contract', function 
 
     expect($launcherFile)->not->toBeNull()
         ->and(hash('sha256', $launcherFile['contents']))->toBe($launcher['launcher_source_sha256'])
+        ->and($nativeCrate)->not->toBeNull()
+        ->and($nativeSemantics)->not->toBeNull()
+        ->and(hash('sha256', $nativeSemantics['contents']))->toBe($launcher['native_supervisor_semantics_sha256'])
         ->and($signerStoreFile)->not->toBeNull()
         ->and(hash('sha256', $signerStoreFile['contents']))->toBe($signerStore['sha256'])
         ->and(LiveEvidenceAttestationGuard::loadTrustedSigners())->toBe([])
@@ -2047,7 +2063,7 @@ it('accepts a complete causal A run B chain and rejects signed-chain mutations',
             $receipt,
             $authorizationReferences,
             $payload['commitments'],
-        ))->toThrow(RuntimeException::class, 'brokered effect-execution receipts')
+        ))->toThrow(RuntimeException::class, 'pinned native broker session')
             ->and(fn () => LiveEvidenceAttestationGuard::prepareEvidenceEnvelopeForSigning(
                 $payload,
                 $signerId,
@@ -2291,7 +2307,7 @@ it('accepts a complete causal A run B chain and rejects signed-chain mutations',
             $policy['maximum_signing_delay_seconds'],
             $trustedSigners,
             $trustedConsumptionAuthorities,
-        ))->toThrow(RuntimeException::class, 'brokered effect-execution verifier is not provisioned')
+        ))->toThrow(RuntimeException::class, 'externally pinned native policy root')
             ->and(fakturowniaArtifactAttestationIsValid(
                 $repositoryRoot,
                 $liveArtifact,

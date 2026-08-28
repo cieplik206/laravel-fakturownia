@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Cieplik206\Fakturownia\Tests\Contract\Support;
 
+use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\NativeBrokerSession;
+use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\SignedLiveProbeAuthorization;
 use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\VerifiedLaunchManifest;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -124,6 +126,7 @@ final class KsefDemoProbeConfiguration
         public int $connectTimeoutMs = self::DefaultConnectTimeoutMs,
         public int $requestTimeoutMs = self::DefaultRequestTimeoutMs,
         public int $minimumPdfSizeBytes = self::DefaultMinimumPdfSizeBytes,
+        #[SensitiveParameter] private ?NativeBrokerSaloonSender $nativeBrokerSender = null,
     ) {
         if (array_keys($profiles) !== array_keys(self::ExpectedMatrix)) {
             throw new InvalidArgumentException('The complete ordered four-profile KSeF DEMO matrix is required.');
@@ -163,6 +166,14 @@ final class KsefDemoProbeConfiguration
         if (count(array_unique($hosts)) !== count($hosts)) {
             throw new InvalidArgumentException('Every KSeF DEMO profile must use an isolated tenant.');
         }
+
+        if ($nativeBrokerSender !== null) {
+            foreach ($profiles as $profile) {
+                if (! $profile->endpoint->isNativeBrokered()) {
+                    throw new InvalidArgumentException('Every native KSeF profile must use a broker-only placeholder endpoint.');
+                }
+            }
+        }
     }
 
     public static function enabled(): bool
@@ -173,6 +184,83 @@ final class KsefDemoProbeConfiguration
     public static function fromEnvironment(#[SensitiveParameter] VerifiedLaunchManifest $launchManifest): never
     {
         $launchManifest->sha256();
+    }
+
+    public static function fromNativeBrokerSession(#[SensitiveParameter] NativeBrokerSession $session): self
+    {
+        $authority = $session->authority;
+        $expectedProfiles = self::profileKeys();
+        sort($expectedProfiles, SORT_STRING);
+
+        if ($authority->evidenceContract !== self::EvidenceContract
+            || $authority->profiles !== $expectedProfiles
+            || count($authority->signedAuthorizations) !== 4) {
+            throw new InvalidArgumentException('The native broker session does not authorize the exact S0.4 matrix.');
+        }
+
+        $limits = $authority->probePlan->limits();
+        self::assertSafeLiveLimits($limits);
+        $targets = $authority->probePlan->targets();
+        $profiles = [];
+        $authorizations = [];
+
+        foreach ($authority->signedAuthorizations as $document) {
+            $authorization = SignedLiveProbeAuthorization::fromArray($document);
+            $profile = $authorization->target['profile'];
+
+            if (isset($authorizations[$profile])) {
+                throw new InvalidArgumentException('The native S0.4 authorization set contains a duplicate profile.');
+            }
+
+            $authorizations[$profile] = $document;
+        }
+
+        foreach (self::profileKeys() as $index => $key) {
+            $target = $targets[$index] ?? null;
+            $authorization = $authorizations[$key] ?? null;
+
+            if (! is_array($target) || ! is_array($authorization)) {
+                throw new InvalidArgumentException("The native S0.4 profile {$key} is incomplete.");
+            }
+
+            $profiles[$key] = KsefDemoProfile::fromNativeBrokerTarget(
+                $key,
+                $target,
+                $authorization,
+                $authority->supervisorAttestation->launchManifestSha256,
+            );
+        }
+
+        return new self(
+            $profiles,
+            $limits['poll_window_ms'],
+            $limits['poll_interval_ms'],
+            $limits['max_search_pages'],
+            $limits['pre_send_observation_window_ms'],
+            $limits['visibility_window_ms'],
+            $limits['visibility_poll_interval_ms'],
+            $limits['connect_timeout_ms'],
+            $limits['request_timeout_ms'],
+            $limits['minimum_pdf_size_bytes'],
+            new NativeBrokerSaloonSender($session),
+        );
+    }
+
+    public function nativeBrokerSession(): NativeBrokerSession
+    {
+        return $this->nativeBrokerSender?->session()
+            ?? throw new RuntimeException('The native S0.4 broker session is unavailable.');
+    }
+
+    public function nativeBrokerSender(): NativeBrokerSaloonSender
+    {
+        return $this->nativeBrokerSender
+            ?? throw new RuntimeException('The native S0.4 broker sender is unavailable.');
+    }
+
+    public function usesNativeBroker(): bool
+    {
+        return $this->nativeBrokerSender !== null;
     }
 
     /**
@@ -331,6 +419,119 @@ final class KsefDemoProbeConfiguration
     }
 
     /**
+     * @param  array<string, mixed>  $fixture
+     * @return array<string, mixed>
+     */
+    public function buildNativeUnsignedEvidencePayload(
+        string $repositoryRoot,
+        string $fixturePath,
+        string $fixtureSha256,
+        #[SensitiveParameter] array $fixture,
+        VerifiedLiveProviderRun $providerRun,
+        VerifiedFreshClaimGrant $verifiedFreshClaimGrant,
+    ): array {
+        if (! $this->usesNativeBroker()) {
+            throw new RuntimeException('Canonical KSeF evidence requires the native broker transport.');
+        }
+
+        $authorizations = $this->signedAuthorizations();
+        $firstEnvelope = $authorizations[0]['envelope'] ?? null;
+        $harness = is_array($firstEnvelope) ? ($firstEnvelope['harness'] ?? null) : null;
+
+        if (! is_array($firstEnvelope)
+            || ! is_array($harness)
+            || ! is_string($harness['repository_commit'] ?? null)
+            || ! is_string($harness['code_sha256'] ?? null)
+            || ! is_string($harness['launch_manifest_sha256'] ?? null)
+            || ! hash_equals($this->launchManifestSha256(), $harness['launch_manifest_sha256'])) {
+            throw new RuntimeException('The native KSeF authorization batch has no canonical harness evidence.');
+        }
+
+        $references = [];
+
+        foreach ($authorizations as $authorization) {
+            $envelope = $authorization['envelope'] ?? null;
+
+            if (! is_array($envelope)
+                || ! is_array($envelope['target'] ?? null)
+                || ! is_string($envelope['target']['profile'] ?? null)
+                || ! is_string($envelope['challenge'] ?? null)) {
+                throw new RuntimeException('A native KSeF authorization cannot be referenced by live evidence.');
+            }
+
+            $references[] = [
+                'profile' => $envelope['target']['profile'],
+                'challenge' => $envelope['challenge'],
+                'sha256' => LiveEvidenceAttestationGuard::signedDocumentSha256($authorization),
+            ];
+        }
+
+        $archivedHarness = LiveEvidenceAttestationGuard::harnessSnapshot(
+            $repositoryRoot,
+            self::EvidenceContract,
+        );
+
+        if (! hash_equals(
+            $harness['code_sha256'],
+            hash('sha256', LiveEvidenceAttestationGuard::canonicalJson($archivedHarness)),
+        )) {
+            throw new RuntimeException('The archived native KSeF harness does not match its authorization batch.');
+        }
+
+        $session = $this->nativeBrokerSession();
+        $claimStartedAt = new DateTimeImmutable(
+            $session->authority->runStartedAt,
+            new DateTimeZone('UTC'),
+        );
+
+        return LiveEvidenceAttestationGuard::buildLiveUnsignedEvidencePayload(
+            self::EvidenceContract,
+            $fixturePath,
+            $fixtureSha256,
+            $harness['repository_commit'],
+            $harness['code_sha256'],
+            $archivedHarness,
+            $verifiedFreshClaimGrant,
+            $providerRun,
+            $authorizations,
+            LiveEvidenceAttestationGuard::buildConsumptionReceipt($authorizations, $claimStartedAt),
+            $references,
+            LiveEvidenceAttestationGuard::evidenceCommitments(
+                $authorizations,
+                $fixture,
+                self::EvidenceContract,
+            ),
+            $this->nativeBrokerSender()->effectExecutionReceipts(),
+            $session,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array{unsigned_path: string, authorization_paths: list<string>}
+     */
+    public function publishNativeUnsignedEvidenceSidecar(
+        string $repositoryRoot,
+        #[SensitiveParameter] array $payload,
+        VerifiedLiveProviderRun $providerRun,
+        VerifiedFreshClaimGrant $verifiedFreshClaimGrant,
+    ): array {
+        if (! $this->usesNativeBroker()) {
+            throw new RuntimeException('Only the native KSeF transport may publish a canonical live sidecar.');
+        }
+
+        return LiveEvidenceAttestationGuard::writeLiveUnsignedEvidenceSidecar(
+            $repositoryRoot,
+            $payload,
+            $this->signedAuthorizations(),
+            $verifiedFreshClaimGrant,
+            $providerRun,
+            self::MaximumAuthorizationTtlSeconds,
+            $this->nativeBrokerSession(),
+        );
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      * @param  array<string, string>  $trustedOperatorSigners
      * @param  array<string, string>  $trustedConsumptionAuthorities
@@ -373,8 +574,11 @@ final class KsefDemoProbeConfiguration
             'request_timeout_ms',
             'minimum_pdf_size_bytes',
         ];
+        $actualKeys = array_keys($limits);
+        sort($actualKeys, SORT_STRING);
+        sort($expectedKeys, SORT_STRING);
 
-        if (array_keys($limits) !== $expectedKeys) {
+        if ($actualKeys !== $expectedKeys) {
             throw new InvalidArgumentException('The live KSeF probe limits must use the exact signed contract.');
         }
 
@@ -631,6 +835,7 @@ final class KsefDemoProfile
         public DateTimeImmutable $operatorAttestedAt,
         public DateTimeImmutable $operatorAttestationExpiresAt,
         #[SensitiveParameter] public string $settingsChecksum,
+        private bool $nativeBrokered = false,
     ) {
         self::validateTemplate($validInvoice, true);
         self::validateTemplate($invalidInvoice, false);
@@ -728,9 +933,71 @@ final class KsefDemoProfile
             $operatorAttestationExpiresAt,
         );
 
-        if (! preg_match('/^[a-f0-9]{64}$/', $settingsChecksum) || ! \hash_equals($expectedSettingsChecksum, $settingsChecksum)) {
+        if (! preg_match('/^[a-f0-9]{64}$/', $settingsChecksum)
+            || (! $nativeBrokered && ! \hash_equals($expectedSettingsChecksum, $settingsChecksum))
+            || ($nativeBrokered && ! $endpoint->isNativeBrokered())) {
             throw new InvalidArgumentException('The settings checksum does not match the declared KSeF profile.');
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $target
+     * @param  array<string, mixed>  $signedAuthorization
+     */
+    public static function fromNativeBrokerTarget(
+        string $key,
+        #[SensitiveParameter] array $target,
+        #[SensitiveParameter] array $signedAuthorization,
+        string $expectedLaunchManifestSha256,
+    ): self {
+        $authorization = SignedLiveProbeAuthorization::fromArray($signedAuthorization);
+        $ownership = KsefOwnership::tryFrom(self::string($target, 'ownership'));
+        $validationMode = KsefValidationMode::tryFrom(self::string($target, 'validation_mode'));
+        $validInvoice = $target['valid_invoice'] ?? null;
+        $invalidInvoice = $target['invalid_invoice'] ?? null;
+
+        if (($target['profile'] ?? null) !== $key
+            || ($target['target_key'] ?? null) !== $key
+            || ! $ownership instanceof KsefOwnership
+            || ! $validationMode instanceof KsefValidationMode
+            || ! is_array($validInvoice)
+            || array_is_list($validInvoice)
+            || ! is_array($invalidInvoice)
+            || array_is_list($invalidInvoice)
+            || $authorization->evidenceContract !== KsefDemoProbeConfiguration::EvidenceContract
+            || $authorization->target['profile'] !== $key
+            || ! \hash_equals($authorization->harness['launch_manifest_sha256'], $expectedLaunchManifestSha256)) {
+            throw new InvalidArgumentException("The native S0.4 profile {$key} does not match its verified authorization.");
+        }
+
+        $profile = new self(
+            $key,
+            $ownership,
+            $validationMode,
+            KsefDemoEndpoint::forNativeBroker(
+                $key,
+                self::string($target, 'expected_account_fingerprint'),
+            ),
+            $validInvoice,
+            $invalidInvoice,
+            self::string($target, 'expected_validation_field'),
+            self::string($target, 'ksef_environment'),
+            $target['gov_auto_send_mode'] ?? null,
+            self::boolean($target, 'validate_invoices_for_gov'),
+            self::boolean($target, 'buyer_company'),
+            self::boolean($target, 'throwaway_tenant'),
+            self::boolean($target, 'email_delivery_disabled'),
+            self::boolean($target, 'payments_disabled'),
+            self::boolean($target, 'webhooks_disabled'),
+            $authorization->issuedAtInstant(),
+            $authorization->expiresAtInstant(),
+            self::string($target, 'settings_checksum'),
+            true,
+        );
+        $profile->verifiedAuthorizationEnvelope = $authorization->envelope();
+        $profile->verifiedSignedAuthorization = $signedAuthorization;
+
+        return $profile;
     }
 
     /**
@@ -881,7 +1148,7 @@ final class KsefDemoProfile
     {
         return $this->verifiedAuthorizationEnvelope !== null
             && $this->verifiedSignedAuthorization !== null
-            && $this->attestationBindingKey !== null;
+            && ($this->attestationBindingKey !== null || $this->nativeBrokered);
     }
 
     public function verifiedAuthorizationSha256(): string
@@ -907,6 +1174,24 @@ final class KsefDemoProfile
     {
         if ($this->verifiedSignedAuthorization === null || $this->verifiedAuthorizationEnvelope === null) {
             throw new RuntimeException('A verified KSeF profile authorization is required at the write boundary.');
+        }
+
+        if ($this->nativeBrokered) {
+            $authorization = SignedLiveProbeAuthorization::fromArray($this->verifiedSignedAuthorization);
+
+            if (! \hash_equals(
+                LiveEvidenceAttestationGuard::canonicalJson($this->verifiedAuthorizationEnvelope),
+                LiveEvidenceAttestationGuard::canonicalJson($authorization->envelope()),
+            )
+                || $authorization->issuedAtInstant() > $now
+                || $authorization->expiresAtInstant() <= $now
+                || $minimumRemainingSeconds < 1
+                || self::instantMicroseconds($authorization->expiresAtInstant()) - self::instantMicroseconds($now)
+                    < $minimumRemainingSeconds * 1_000_000) {
+                throw new RuntimeException('The native KSeF profile authorization is invalid at the write boundary.');
+            }
+
+            return;
         }
 
         $envelope = $this->trustedAuthorizationSigners === null
@@ -1296,11 +1581,14 @@ final class KsefDemoEndpoint
 
     public string $host;
 
+    private bool $nativeBrokered = false;
+
     public function __construct(
         public string $profileKey,
         #[SensitiveParameter] string $baseUrl,
         #[SensitiveParameter] public string $token,
         #[SensitiveParameter] public string $expectedFingerprint,
+        bool $nativeBrokered = false,
     ) {
         $parts = \parse_url($baseUrl);
         $host = is_array($parts) ? strtolower((string) ($parts['host'] ?? '')) : '';
@@ -1314,16 +1602,49 @@ final class KsefDemoEndpoint
             && ! isset($parts['query'])
             && ! isset($parts['fragment']);
 
-        if (! $plainHttps || ! preg_match('/^s04-demo-[a-z0-9-]+\.fakturownia\.pl$/', $host)) {
+        $nativeHost = preg_match('/^(?:explicit-block|explicit-persist|auto-block|auto-persist)\.s04-native\.invalid$/D', $host) === 1;
+
+        if (! $plainHttps
+            || ($nativeBrokered && ! $nativeHost)
+            || (! $nativeBrokered && ! preg_match('/^s04-demo-[a-z0-9-]+\.fakturownia\.pl$/', $host))) {
             throw new InvalidArgumentException('Use an approved s04-demo-* Fakturownia.pl throwaway tenant over plain HTTPS.');
         }
 
-        if ($token === '' || ! preg_match('/^[a-f0-9]{64}$/', $expectedFingerprint)) {
+        if (($nativeBrokered && $token !== NativeBrokerSaloonSender::TokenSentinel)
+            || $token === ''
+            || ! preg_match('/^[a-f0-9]{64}$/', $expectedFingerprint)) {
             throw new InvalidArgumentException('Confirm the exact KSeF DEMO tenant fingerprint and token.');
         }
 
         $this->baseUrl = "https://{$host}";
         $this->host = $host;
+        $this->nativeBrokered = $nativeBrokered;
+    }
+
+    public static function forNativeBroker(
+        string $profileKey,
+        #[SensitiveParameter] string $expectedFingerprint,
+    ): self {
+        $hostKey = match ($profileKey) {
+            'explicit_block' => 'explicit-block',
+            'explicit_persist' => 'explicit-persist',
+            'auto_block' => 'auto-block',
+            'auto_persist' => 'auto-persist',
+            default => throw new InvalidArgumentException('The native KSeF profile key is invalid.'),
+        };
+
+        return new self(
+            $profileKey,
+            "https://{$hostKey}.s04-native.invalid",
+            NativeBrokerSaloonSender::TokenSentinel,
+            $expectedFingerprint,
+            true,
+        );
+    }
+
+    public function isNativeBrokered(): bool
+    {
+        return $this->nativeBrokered;
     }
 
     public static function fingerprintFor(
@@ -1336,6 +1657,14 @@ final class KsefDemoEndpoint
 
     public function verifyAccountId(#[SensitiveParameter] string $accountId): void
     {
+        if ($this->nativeBrokered) {
+            if (preg_match('/^[1-9][0-9]{0,18}$/D', $accountId) !== 1) {
+                throw new RuntimeException('The native KSeF account ID is not canonical.');
+            }
+
+            return;
+        }
+
         $actual = self::fingerprintFor($this->profileKey, $this->host, $accountId);
 
         if (! \hash_equals($this->expectedFingerprint, $actual)) {

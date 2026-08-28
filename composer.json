@@ -88,12 +88,19 @@
         "analyse": "phpstan analyse",
         "format": "pint src tests config database bin",
         "format:check": "pint --test src tests config database bin",
+        "native:check": [
+            "cargo fmt --manifest-path native-broker/Cargo.toml --check",
+            "cargo test --manifest-path native-broker/Cargo.toml --all-features",
+            "cargo clippy --manifest-path native-broker/Cargo.toml --all-targets --all-features -- -D warnings",
+            "cargo check --manifest-path native-broker/Cargo.toml --target x86_64-unknown-linux-gnu --no-default-features"
+        ],
         "quality:validate": "@composer validate --strict",
         "security:audit": "@composer audit",
         "check": [
             "@quality:validate",
             "@format:check",
             "@analyse",
+            "@native:check",
             "@test",
             "@test:pgsql",
             "@security:audit"

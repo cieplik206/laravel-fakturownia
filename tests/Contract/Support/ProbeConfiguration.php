@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Cieplik206\Fakturownia\Tests\Contract\Support;
 
 use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\ConsumptionClaimRequest;
+use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\ConsumptionReceipt;
+use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\NativeBrokerSession;
+use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\SignedLiveProbeAuthorization;
 use DateTimeImmutable;
 use DateTimeZone;
 use InvalidArgumentException;
@@ -152,6 +155,7 @@ final class ProbeConfiguration
         #[SensitiveParameter] private ?LiveEvidenceConsumptionAuthority $testConsumptionAuthority = null,
         #[SensitiveParameter] private ?ProbeLiteralResponseQueue $testResponseQueue = null,
         private ?string $expectedLaunchManifestSha256 = null,
+        #[SensitiveParameter] private ?NativeBrokerSaloonSender $nativeBrokerSender = null,
     ) {
         $templatesValid = ! array_diff(['invoice', 'secondary_account_invoice', 'correction_invoice'], array_keys(array_filter($payload, 'is_array')));
         $safety = $payload['safety'] ?? [];
@@ -183,6 +187,10 @@ final class ProbeConfiguration
                 || $testResponseQueue === null
                 || $expectedLaunchManifestSha256 !== self::offlineLaunchManifestSha256ForTesting())) {
             throw new InvalidArgumentException('The offline authority seam requires operator keys, distinct authority keys, an authority and a sealed literal response queue.');
+        }
+        if ($nativeBrokerSender !== null
+            && ($usesTestAuthoritySeam || $testResponseQueue !== null)) {
+            throw new InvalidArgumentException('The native broker transport cannot be combined with an offline authority seam.');
         }
         if ($expectedLaunchManifestSha256 !== null
             && preg_match('/^[a-f0-9]{64}$/', $expectedLaunchManifestSha256) !== 1) {
@@ -255,6 +263,7 @@ final class ProbeConfiguration
             $consumptionAuthority,
             $responseQueue,
             $trustedSigners === null ? null : self::offlineLaunchManifestSha256ForTesting(),
+            $this->nativeBrokerSender,
         );
     }
 
@@ -278,6 +287,52 @@ final class ProbeConfiguration
             $this->testConsumptionAuthority,
             $responseQueue,
             $this->expectedLaunchManifestSha256,
+            $this->nativeBrokerSender,
+        );
+    }
+
+    public static function fromNativeBrokerSession(#[SensitiveParameter] NativeBrokerSession $session): self
+    {
+        $authority = $session->authority;
+
+        if ($authority->evidenceContract !== self::EvidenceContract
+            || $authority->profiles !== [self::AuthorizationProfile]
+            || \count($authority->signedAuthorizations) !== 1) {
+            throw new InvalidArgumentException('The native broker session does not authorize the exact S0.3 profile.');
+        }
+
+        $plan = $authority->probePlan;
+        $limits = $plan->limits();
+        $targets = $plan->targets();
+
+        if (\count($targets) !== 2) {
+            throw new InvalidArgumentException('The native S0.3 plan requires two exact target descriptors.');
+        }
+
+        self::assertLiveLimits(
+            $limits['visibility_window_ms'],
+            $limits['poll_interval_ms'],
+            $limits['max_search_pages'],
+            $limits['lost_response_timeout_ms'],
+            $limits['connect_timeout_ms'],
+            $limits['request_timeout_ms'],
+        );
+        $primaryFingerprint = self::nativeTargetFingerprint($targets[0], 'primary');
+        $secondaryFingerprint = self::nativeTargetFingerprint($targets[1], 'secondary');
+
+        return new self(
+            ProbeEndpoint::forNativeBroker($plan->environment(), 'primary', $primaryFingerprint),
+            ProbeEndpoint::forNativeBroker($plan->environment(), 'secondary', $secondaryFingerprint),
+            $plan->payload(),
+            $limits['visibility_window_ms'],
+            $limits['poll_interval_ms'],
+            $limits['max_search_pages'],
+            $limits['lost_response_timeout_ms'],
+            $limits['connect_timeout_ms'],
+            $limits['request_timeout_ms'],
+            operatorAuthorization: $authority->signedAuthorizations[0],
+            expectedLaunchManifestSha256: $authority->supervisorAttestation->launchManifestSha256,
+            nativeBrokerSender: new NativeBrokerSaloonSender($session),
         );
     }
 
@@ -288,6 +343,22 @@ final class ProbeConfiguration
         }
 
         $signedAuthorization = $this->assertTrustedOperatorAuthorization($now);
+
+        if ($this->nativeBrokerSender !== null) {
+            $session = $this->nativeBrokerSession();
+            $grant = LiveEvidenceAttestationGuard::acceptNativeBrokerAuthority($session, $now);
+            $claimRequest = $grant->grant->receipt->envelope->claimRequest;
+
+            $this->verifiedFreshClaimGrant = $grant;
+            $this->consumptionClaimRequest = $claimRequest;
+            $this->authorizationConsumptionReceipt = [
+                'local_claim' => LiveEvidenceAttestationGuard::buildConsumptionReceipt([$signedAuthorization], $now),
+                'authority_receipt' => $grant->toArray(),
+                'effect_execution_receipts' => [],
+            ];
+
+            return $grant;
+        }
 
         if ($this->trustedAttestationSigners === null) {
             throw self::brokeredExecutionUnavailable();
@@ -352,6 +423,10 @@ final class ProbeConfiguration
 
     public function assertProviderRunAvailable(): void
     {
+        if ($this->nativeBrokerSender !== null) {
+            return;
+        }
+
         if ($this->usesOfflineTestAuthoritySeam()) {
             $this->assertSignatureOnlySeamUsesLiteralTransport();
 
@@ -363,6 +438,13 @@ final class ProbeConfiguration
 
     public function assertRealProviderTransportOrigin(): void
     {
+        if ($this->nativeBrokerSender !== null
+            && $this->primary->isNativeBrokered()
+            && $this->secondary->isNativeBrokered()
+            && $this->verifiedFreshClaimGrant instanceof VerifiedFreshClaimGrant) {
+            return;
+        }
+
         if ($this->usesOfflineTestAuthoritySeam()
             || $this->trustedConsumptionAuthorities !== null
             || $this->testConsumptionAuthority !== null
@@ -388,6 +470,25 @@ final class ProbeConfiguration
     /** @return array<string, mixed> */
     public function assertTrustedOperatorAuthorization(DateTimeImmutable $now): array
     {
+        if ($this->nativeBrokerSender !== null) {
+            $signedAuthorization = $this->operatorAuthorization
+                ?? throw new RuntimeException('The native S0.3 authorization is unavailable.');
+            $authorization = SignedLiveProbeAuthorization::fromArray($signedAuthorization);
+
+            if ($authorization->issuedAtInstant() > $now
+                || $authorization->expiresAtInstant() <= $now
+                || $authorization->evidenceContract !== self::EvidenceContract
+                || $authorization->target['profile'] !== self::AuthorizationProfile
+                || ! hash_equals(
+                    $authorization->harness['launch_manifest_sha256'],
+                    $this->authorizationLaunchManifestSha256(),
+                )) {
+                throw new RuntimeException('The native S0.3 authorization is not valid for this run.');
+            }
+
+            return $signedAuthorization;
+        }
+
         if ($this->operatorAuthorization === null || $this->attestationBindingKey === null) {
             throw new RuntimeException('A signed operator attestation and non-persisted binding key are required before live HTTP.');
         }
@@ -440,6 +541,20 @@ final class ProbeConfiguration
             throw new RuntimeException('The S0.3 run duration is outside the frozen safe range.');
         }
 
+        if ($this->nativeBrokerSender !== null) {
+            $authorization = SignedLiveProbeAuthorization::fromArray(
+                $this->operatorAuthorization
+                    ?? throw new RuntimeException('The native S0.3 authorization is unavailable.'),
+            );
+
+            if ($runStartedAt < $authorization->issuedAtInstant()
+                || $runFinishedAt >= $authorization->expiresAtInstant()) {
+                throw new RuntimeException('The native S0.3 run is not fully contained by its authorization.');
+            }
+
+            return $authorization->envelope();
+        }
+
         $envelope = $this->trustedAttestationSigners === null
             ? LiveEvidenceAttestationGuard::assertHistoricalAuthorization(
                 $this->operatorAuthorization ?? [],
@@ -474,6 +589,22 @@ final class ProbeConfiguration
 
         $grant = $this->verifiedFreshClaimGrant
             ?? throw new RuntimeException('A verified fresh external authority grant is required before an invoice write.');
+
+        if ($this->nativeBrokerSender !== null) {
+            $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+            $this->assertTrustedOperatorAuthorization($now);
+            $receipt = ConsumptionReceipt::fromArray($grant->toArray());
+            $receiptExpiresAt = self::strictAuthorizationDate($receipt->envelope->expiresAt);
+
+            if ($receiptExpiresAt <= $now->modify('+'.(int) ceil($this->requestTimeoutMs / 1_000).' seconds')) {
+                throw new RuntimeException('The native S0.3 authority receipt expires before the bounded write can finish.');
+            }
+
+            $this->consumedWriteAttempts += $writeAttempts;
+
+            return;
+        }
+
         $claimRequest = $this->consumptionClaimRequest();
         $signedAuthorization = $this->operatorAuthorization
             ?? throw new RuntimeException('The signed S0.3 authorization is unavailable at the effect boundary.');
@@ -527,11 +658,33 @@ final class ProbeConfiguration
 
     public function bindTestTransport(#[SensitiveParameter] FakturowniaProbeConnector $connector): FakturowniaProbeConnector
     {
+        if ($this->nativeBrokerSender !== null) {
+            return $connector->withNativeBrokerSender($this->nativeBrokerSender);
+        }
+
         if ($this->testResponseQueue === null) {
             return $connector;
         }
 
         return $connector->withLiteralResponseQueue($this->testResponseQueue);
+    }
+
+    public function nativeBrokerSession(): NativeBrokerSession
+    {
+        return $this->nativeBrokerSender?->session()
+            ?? throw new RuntimeException('The native S0.3 broker session is unavailable.');
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function nativeEffectExecutionReceipts(): array
+    {
+        return $this->nativeBrokerSender?->effectExecutionReceipts()
+            ?? throw new RuntimeException('The native S0.3 effect receipts are unavailable.');
+    }
+
+    public function usesNativeBroker(): bool
+    {
+        return $this->nativeBrokerSender !== null;
     }
 
     /** @return array<string, mixed> */
@@ -633,6 +786,8 @@ final class ProbeConfiguration
                 $localClaim,
                 $authorizations,
                 $commitments,
+                $this->nativeEffectExecutionReceipts(),
+                $this->nativeBrokerSession(),
             );
         }
 
@@ -688,6 +843,7 @@ final class ProbeConfiguration
                 $this->verifiedFreshClaimGrant(),
                 $providerRun,
                 self::MaximumAttestationTtlSeconds,
+                $this->nativeBrokerSession(),
             );
         }
 
@@ -748,6 +904,7 @@ final class ProbeConfiguration
     {
         $repositoryRoot = dirname(__DIR__, 3);
         $gitDirectory = self::resolveGitDirectory($repositoryRoot);
+        $commonGitDirectory = self::resolveGitCommonDirectory($gitDirectory);
         $head = self::readTrimmedFile($gitDirectory.'/HEAD');
 
         if (preg_match('/^[a-f0-9]{40}$/', $head) === 1) {
@@ -763,24 +920,31 @@ final class ProbeConfiguration
             throw new RuntimeException('The SDK repository HEAD reference is invalid.');
         }
 
-        $looseReference = $gitDirectory.'/'.$reference;
-        if (is_file($looseReference)) {
-            $commit = self::readTrimmedFile($looseReference);
+        foreach (array_values(array_unique([$gitDirectory, $commonGitDirectory])) as $referenceRoot) {
+            $looseReference = $referenceRoot.'/'.$reference;
 
-            if (preg_match('/^[a-f0-9]{40}$/', $commit) === 1) {
-                return $commit;
+            if (is_file($looseReference)) {
+                $commit = self::readTrimmedFile($looseReference);
+
+                if (preg_match('/^[a-f0-9]{40}$/', $commit) === 1) {
+                    return $commit;
+                }
             }
         }
 
-        $packedReferences = self::readTrimmedFile($gitDirectory.'/packed-refs');
-        foreach (preg_split('/\R/', $packedReferences) ?: [] as $line) {
-            if ($line === '' || str_starts_with($line, '#') || str_starts_with($line, '^')) {
-                continue;
-            }
+        $packedReferencesPath = $commonGitDirectory.'/packed-refs';
 
-            [$commit, $packedReference] = array_pad(explode(' ', $line, 2), 2, null);
-            if ($packedReference === $reference && is_string($commit) && preg_match('/^[a-f0-9]{40}$/', $commit) === 1) {
-                return $commit;
+        if (is_file($packedReferencesPath)) {
+            $packedReferences = self::readTrimmedFile($packedReferencesPath);
+            foreach (preg_split('/\R/', $packedReferences) ?: [] as $line) {
+                if ($line === '' || str_starts_with($line, '#') || str_starts_with($line, '^')) {
+                    continue;
+                }
+
+                [$commit, $packedReference] = array_pad(explode(' ', $line, 2), 2, null);
+                if ($packedReference === $reference && is_string($commit) && preg_match('/^[a-f0-9]{40}$/', $commit) === 1) {
+                    return $commit;
+                }
             }
         }
 
@@ -978,6 +1142,27 @@ final class ProbeConfiguration
         return $resolved;
     }
 
+    private static function resolveGitCommonDirectory(string $gitDirectory): string
+    {
+        $commonDirectoryPointer = $gitDirectory.'/commondir';
+
+        if (! is_file($commonDirectoryPointer)) {
+            return $gitDirectory;
+        }
+
+        $path = self::readTrimmedFile($commonDirectoryPointer);
+        $candidate = str_starts_with($path, DIRECTORY_SEPARATOR)
+            ? $path
+            : $gitDirectory.'/'.$path;
+        $resolved = realpath($candidate);
+
+        if ($resolved === false || ! is_dir($resolved) || is_link($resolved)) {
+            throw new RuntimeException('The SDK common Git directory pointer cannot be resolved safely.');
+        }
+
+        return $resolved;
+    }
+
     private static function readTrimmedFile(string $path): string
     {
         if (is_link($path) || ! is_file($path)) {
@@ -1005,6 +1190,21 @@ final class ProbeConfiguration
                 throw new InvalidArgumentException('Every position must contain name, quantity, price_net and tax.');
             }
         }
+    }
+
+    /** @param array<string, mixed> $target */
+    private static function nativeTargetFingerprint(#[SensitiveParameter] array $target, string $targetKey): string
+    {
+        $actualTargetKey = $target['target_key'] ?? null;
+        $fingerprint = $target['expected_account_fingerprint'] ?? null;
+
+        if ($actualTargetKey !== $targetKey
+            || ! is_string($fingerprint)
+            || preg_match('/^[a-f0-9]{64}$/D', $fingerprint) !== 1) {
+            throw new InvalidArgumentException("The native S0.3 target {$targetKey} is invalid.");
+        }
+
+        return $fingerprint;
     }
 
     private function assertSignatureOnlySeamUsesLiteralTransport(): void
@@ -1044,11 +1244,14 @@ final class ProbeEndpoint
 
     public string $host;
 
+    private bool $nativeBrokered = false;
+
     public function __construct(
         public string $environment,
         #[SensitiveParameter] string $baseUrl,
         #[SensitiveParameter] public string $token,
         #[SensitiveParameter] public string $expectedFingerprint,
+        bool $nativeBrokered = false,
     ) {
         $parts = parse_url($baseUrl);
         $host = is_array($parts) ? strtolower((string) ($parts['host'] ?? '')) : '';
@@ -1072,18 +1275,50 @@ final class ProbeEndpoint
             default => null,
         };
 
-        if (! $plainHttps || $expectedDomain === null) {
+        $nativeHost = match ($environment) {
+            'demo_pl', 'demo_regional' => \preg_match('/^(?:primary|secondary)\.s03-native\.invalid$/D', $host) === 1,
+            default => false,
+        };
+
+        if (! $plainHttps || $expectedDomain === null || ($nativeBrokered && ! $nativeHost)) {
             throw new InvalidArgumentException('Use a plain HTTPS URL and explicit DEMO environment.');
         }
-        if (! preg_match('/^s03-demo-[a-z0-9-]+\.'.preg_quote($expectedDomain, '/').'$/', $host)) {
+        if (! $nativeBrokered
+            && ! preg_match('/^s03-demo-[a-z0-9-]+\.'.preg_quote($expectedDomain, '/').'$/', $host)) {
             throw new InvalidArgumentException('Use an approved s03-demo-* throwaway tenant.');
         }
-        if ($token === '' || ! preg_match('/^[a-f0-9]{64}$/', $expectedFingerprint)) {
+        if (($nativeBrokered && $token !== NativeBrokerSaloonSender::TokenSentinel)
+            || $token === ''
+            || ! preg_match('/^[a-f0-9]{64}$/', $expectedFingerprint)) {
             throw new InvalidArgumentException('Confirm the exact DEMO tenant fingerprint and token.');
         }
 
         $this->baseUrl = 'https://'.$host;
         $this->host = $host;
+        $this->nativeBrokered = $nativeBrokered;
+    }
+
+    public static function forNativeBroker(
+        string $environment,
+        string $targetKey,
+        #[SensitiveParameter] string $expectedFingerprint,
+    ): self {
+        if (! \in_array($targetKey, ['primary', 'secondary'], true)) {
+            throw new InvalidArgumentException('The native S0.3 target key is invalid.');
+        }
+
+        return new self(
+            $environment,
+            "https://{$targetKey}.s03-native.invalid",
+            NativeBrokerSaloonSender::TokenSentinel,
+            $expectedFingerprint,
+            true,
+        );
+    }
+
+    public function isNativeBrokered(): bool
+    {
+        return $this->nativeBrokered;
     }
 
     public static function fingerprintFor(
@@ -1105,6 +1340,10 @@ final class ProbeEndpoint
 
     public function verifyAccountId(#[SensitiveParameter] string $accountId): string
     {
+        if ($this->nativeBrokered) {
+            return self::accountIdentityFor($this->environment, $accountId);
+        }
+
         $fingerprint = self::fingerprintFor($this->environment, $this->host, $accountId);
         if (! hash_equals($this->expectedFingerprint, $fingerprint)) {
             throw new RuntimeException('The API token does not match the allowlisted throwaway DEMO account.');

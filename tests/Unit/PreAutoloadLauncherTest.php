@@ -9,20 +9,24 @@ declare(strict_types=1);
  *     manifest: string,
  *     signature: string,
  *     snapshot: string,
- *     credential: string,
- *     authorization: string,
  *     sentinel: string,
  *     result: string,
  *     source: string,
  *     source_original: string,
  *     manifest_sha256: string,
+ *     native_trust_policy_signer_id: string,
+ *     native_trust_policy_public_key_base64: string,
+ *     native_supervisor_semantics_sha256: string,
  *     php_executable: string,
  *     php_arguments: list<string>
  * }
  */
 function fakturowniaPreAutoloadFixture(?string $signedMutation = null): array
 {
-    $temporaryRoot = \realpath(\dirname(__DIR__, 2));
+    $configuredTestRoot = \getenv('FAKTUROWNIA_PREAUTOLOAD_TEST_ROOT');
+    $temporaryRoot = \realpath(\is_string($configuredTestRoot) && $configuredTestRoot !== ''
+        ? $configuredTestRoot
+        : \dirname(__DIR__, 2));
 
     if (! \is_string($temporaryRoot)) {
         throw new RuntimeException('Cannot resolve the repository test directory.');
@@ -37,9 +41,6 @@ function fakturowniaPreAutoloadFixture(?string $signedMutation = null): array
     $launcherPath = "{$base}/fakturownia-live-evidence-launcher.php";
     $sentinelPath = "{$base}/autoload-executed";
     $resultPath = "{$base}/probe-result.json";
-    $credentialPath = "{$base}/credential.json";
-    $authorizationPath = "{$base}/authorization.json";
-
     foreach ([$base, $manifestRoot, $snapshotRoot, $staging] as $directory) {
         if (! \is_dir($directory) && ! \mkdir($directory, 0o700, true)) {
             throw new RuntimeException('Cannot create a pre-autoload test directory.');
@@ -60,14 +61,14 @@ function fakturowniaPreAutoloadFixture(?string $signedMutation = null): array
             'private const TrustedOwnerUid = 0;',
             'private const RequireDistinctRuntimeOwner = true;',
             'private const EnforceRuntimeAncestorOwnership = true;',
-            'private const NativeSupervisorDeploymentAvailable = false;',
+            "private const TrustedAncestorRoot = '/';",
         ],
         [
             "private const PolicyPath = '{$policyPath}';",
             "private const TrustedOwnerUid = {$uid};",
             'private const RequireDistinctRuntimeOwner = false;',
             'private const EnforceRuntimeAncestorOwnership = false;',
-            'private const NativeSupervisorDeploymentAvailable = true;',
+            "private const TrustedAncestorRoot = '{$temporaryRoot}';",
         ],
         $launcher,
         $replacementCount,
@@ -83,6 +84,10 @@ function fakturowniaPreAutoloadFixture(?string $signedMutation = null): array
     $secretKey = \sodium_crypto_sign_secretkey($keyPair);
     $publicKey = \sodium_crypto_sign_publickey($keyPair);
     fakturowniaPreAutoloadWrite($publicKeyPath, $publicKey, 0o444);
+    $nativeTrustKeyPair = \sodium_crypto_sign_keypair();
+    $nativeTrustPolicySignerId = 'native-policy-test';
+    $nativeTrustPolicyPublicKeyBase64 = \base64_encode(\sodium_crypto_sign_publickey($nativeTrustKeyPair));
+    $nativeSupervisorSemanticsSha256 = \str_repeat('9', 64);
 
     $phpExecutableSource = \realpath(\PHP_BINARY);
 
@@ -100,7 +105,7 @@ function fakturowniaPreAutoloadFixture(?string $signedMutation = null): array
 
     $policy = [
         'contract' => 'cieplik206.fakturownia.preauthenticated-policy',
-        'version' => 2,
+        'version' => 3,
         'manifest_root' => $manifestRoot,
         'snapshot_root' => $snapshotRoot,
         'public_key_path' => $publicKeyPath,
@@ -110,6 +115,9 @@ function fakturowniaPreAutoloadFixture(?string $signedMutation = null): array
         'php_extensions' => $phpRuntime['extensions'],
         'launcher_sha256' => \hash('sha256', $instrumented),
         'probe_entrypoint' => 'tests/Contract/LiveEvidenceProbeEntrypoint.php',
+        'native_trust_policy_signer_id' => $nativeTrustPolicySignerId,
+        'native_trust_policy_public_key_base64' => $nativeTrustPolicyPublicKeyBase64,
+        'native_supervisor_semantics_sha256' => $nativeSupervisorSemanticsSha256,
         'limits' => [
             'manifest_bytes' => 1_048_576,
             'manifest_depth' => 32,
@@ -119,8 +127,6 @@ function fakturowniaPreAutoloadFixture(?string $signedMutation = null): array
             'path_bytes' => 512,
             'file_bytes' => 2_097_152,
             'tree_bytes' => 16_777_216,
-            'credential_bytes' => 4_096,
-            'authorization_bytes' => 65_536,
         ],
     ];
     $policyRaw = fakturowniaPreAutoloadJson($policy);
@@ -145,12 +151,13 @@ declare(strict_types=1);
 
 require dirname(__DIR__, 2).'/vendor/autoload.php';
 
-$credentialFd = getenv('FAKTUROWNIA_CREDENTIAL_FD');
-$authorizationFd = getenv('FAKTUROWNIA_AUTHORIZATION_FD');
 $result = [
-    'credential' => file_get_contents("php://fd/{$credentialFd}"),
-    'authorization' => file_get_contents("php://fd/{$authorizationFd}"),
     'manifest_sha256' => getenv('FAKTUROWNIA_PREAUTOLOAD_VERIFIED_MANIFEST_SHA256'),
+    'native_trust_policy_signer_id' => getenv('FAKTUROWNIA_NATIVE_TRUST_POLICY_SIGNER_ID'),
+    'native_trust_policy_public_key_base64' => getenv('FAKTUROWNIA_NATIVE_TRUST_POLICY_PUBLIC_KEY_BASE64'),
+    'native_supervisor_semantics_sha256' => getenv('FAKTUROWNIA_NATIVE_SUPERVISOR_SEMANTICS_SHA256'),
+    'credential_fd' => getenv('FAKTUROWNIA_CREDENTIAL_FD'),
+    'authorization_fd' => getenv('FAKTUROWNIA_AUTHORIZATION_FD'),
     'inherited_secret' => getenv('LEAK_ME'),
 ];
 
@@ -263,7 +270,7 @@ PHP;
 
     $manifest = [
         'contract' => 'cieplik206.fakturownia.preauthenticated-snapshot',
-        'version' => 2,
+        'version' => 3,
         'repository' => ['commit' => \str_repeat('a', 40)],
         'entrypoint' => 'tests/Contract/LiveEvidenceProbeEntrypoint.php',
         'bindings' => [
@@ -323,8 +330,6 @@ PHP;
         \sodium_crypto_sign_detached($manifestRaw, $secretKey),
         0o444,
     );
-    fakturowniaPreAutoloadWrite($credentialPath, '{"token":"credential-only-after-verify"}', 0o600);
-    fakturowniaPreAutoloadWrite($authorizationPath, '{"authorization":"A-only-after-verify"}', 0o600);
 
     return [
         'base' => $base,
@@ -332,13 +337,14 @@ PHP;
         'manifest' => $manifestPath,
         'signature' => $signaturePath,
         'snapshot' => $snapshot,
-        'credential' => $credentialPath,
-        'authorization' => $authorizationPath,
         'sentinel' => $sentinelPath,
         'result' => $resultPath,
         'source' => "{$snapshot}/src/Example.php",
         'source_original' => $sourceOriginal,
         'manifest_sha256' => $manifestSha256,
+        'native_trust_policy_signer_id' => $nativeTrustPolicySignerId,
+        'native_trust_policy_public_key_base64' => $nativeTrustPolicyPublicKeyBase64,
+        'native_supervisor_semantics_sha256' => $nativeSupervisorSemanticsSha256,
         'php_executable' => $phpExecutable,
         'php_arguments' => $phpRuntime['arguments'],
     ];
@@ -347,23 +353,20 @@ PHP;
 /**
  * @param array{
  *     launcher: string,
- *     credential: string,
- *     authorization: string,
  *     manifest_sha256: string,
+ *     native_supervisor_semantics_sha256: string,
  *     php_executable: string,
  *     php_arguments: list<string>
  * } $fixture
  * @return array{exit_code: int, stdout: string, stderr: string}
  */
-function fakturowniaRunPreAutoloadLauncher(array $fixture): array
+function fakturowniaRunPreAutoloadLauncher(array $fixture, ?string $supervisorInput = null): array
 {
     $command = [
         $fixture['php_executable'],
         ...$fixture['php_arguments'],
         $fixture['launcher'],
-        "--manifest-sha256={$fixture['manifest_sha256']}",
-        "--credential-file={$fixture['credential']}",
-        "--authorization-file={$fixture['authorization']}",
+        '--supervised',
     ];
     $pipes = [];
     $process = \proc_open(
@@ -383,6 +386,13 @@ function fakturowniaRunPreAutoloadLauncher(array $fixture): array
         throw new RuntimeException('Cannot start the pre-autoload launcher subprocess.');
     }
 
+    $supervisorInput ??= fakturowniaPreAutoloadWireFrame([
+        'contract' => 'cieplik206.fakturownia.native-supervisor-launch',
+        'version' => '1',
+        'launch_manifest_sha256' => $fixture['manifest_sha256'],
+        'supervisor_semantics_sha256' => $fixture['native_supervisor_semantics_sha256'],
+    ]);
+    \fwrite($pipes[0], $supervisorInput);
     \fclose($pipes[0]);
     $stdout = \stream_get_contents($pipes[1]);
     $stderr = \stream_get_contents($pipes[2]);
@@ -613,9 +623,22 @@ function fakturowniaPreAutoloadRecordsSha256(array $records): string
 {
     return \hash('sha256', fakturowniaPreAutoloadCanonicalJson([
         'contract' => 'cieplik206.fakturownia.snapshot-file-set',
-        'version' => 2,
+        'version' => 3,
         'files' => $records,
     ]));
+}
+
+/** @param array<string, mixed> $document */
+function fakturowniaPreAutoloadWireFrame(array $document): string
+{
+    $payload = fakturowniaPreAutoloadCanonicalJson($document);
+
+    return fakturowniaPreAutoloadRawWireFrame($payload);
+}
+
+function fakturowniaPreAutoloadRawWireFrame(string $payload): string
+{
+    return \sprintf("%08x\n", \strlen($payload)).$payload;
 }
 
 function fakturowniaPreAutoloadCanonicalJson(mixed $value): string
@@ -715,7 +738,7 @@ function fakturowniaPreAutoloadRemoveTree(string $root): void
     \rmdir($root);
 }
 
-it('fails closed before parsing caller input when the native root supervisor is not deployed', function (): void {
+it('fails closed before parsing caller input outside the exact supervised invocation', function (): void {
     $launcher = \dirname(__DIR__, 2).'/bin/fakturownia-live-evidence-launcher.php';
     $phpRuntime = fakturowniaPreAutoloadPhpRuntime();
     $sentinel = \realpath(\sys_get_temp_dir()).'/fakturownia-forbidden-prepend-'.\bin2hex(\random_bytes(12)).'.php';
@@ -757,7 +780,7 @@ it('fails closed before parsing caller input when the native root supervisor is 
     try {
         expect($exitCode)->toBe(78)
             ->and($stdout)->toBe('')
-            ->and($stderr)->toContain('native root supervisor deployment is unavailable; live execution is fail-closed')
+            ->and($stderr)->toContain('only the native supervisor --supervised invocation is accepted')
             ->and(\file_exists($sentinel.'.executed'))->toBeFalse();
     } finally {
         \unlink($sentinel);
@@ -772,21 +795,61 @@ it('keeps the instrumented verification engine capable of executing only a fully
 
         expect($result['stderr'])->toBe('')
             ->and($result['exit_code'])->toBe(0)
+            ->and($result['stdout'])->toBe(fakturowniaPreAutoloadWireFrame([
+                'contract' => 'cieplik206.fakturownia.native-supervisor-ready',
+                'version' => '1',
+                'launch_manifest_sha256' => $fixture['manifest_sha256'],
+                'supervisor_semantics_sha256' => $fixture['native_supervisor_semantics_sha256'],
+            ]))
             ->and(\file_exists($fixture['result']))->toBeTrue();
 
         $probeResult = \json_decode((string) \file_get_contents($fixture['result']), true, 8, \JSON_THROW_ON_ERROR);
 
         expect(\file_get_contents($fixture['sentinel']))->toBe('executed')
             ->and($probeResult)->toBe([
-                'credential' => '{"token":"credential-only-after-verify"}',
-                'authorization' => '{"authorization":"A-only-after-verify"}',
                 'manifest_sha256' => $fixture['manifest_sha256'],
+                'native_trust_policy_signer_id' => $fixture['native_trust_policy_signer_id'],
+                'native_trust_policy_public_key_base64' => $fixture['native_trust_policy_public_key_base64'],
+                'native_supervisor_semantics_sha256' => $fixture['native_supervisor_semantics_sha256'],
+                'credential_fd' => false,
+                'authorization_fd' => false,
                 'inherited_secret' => false,
             ]);
     } finally {
         fakturowniaPreAutoloadRemoveTree($fixture['base']);
     }
 });
+
+it('rejects a non-canonical or differently provisioned supervisor launch before READY', function (string $mutation): void {
+    $fixture = fakturowniaPreAutoloadFixture();
+
+    try {
+        $launch = match ($mutation) {
+            'semantics' => fakturowniaPreAutoloadWireFrame([
+                'contract' => 'cieplik206.fakturownia.native-supervisor-launch',
+                'version' => '1',
+                'launch_manifest_sha256' => $fixture['manifest_sha256'],
+                'supervisor_semantics_sha256' => \str_repeat('8', 64),
+            ]),
+            'canonical' => fakturowniaPreAutoloadRawWireFrame("{\"version\":\"1\",\"contract\":\"cieplik206.fakturownia.native-supervisor-launch\",\"launch_manifest_sha256\":\"{$fixture['manifest_sha256']}\",\"supervisor_semantics_sha256\":\"{$fixture['native_supervisor_semantics_sha256']}\"}"),
+            'truncated' => "00000010\n{}",
+            default => throw new RuntimeException('Unknown native supervisor mutation.'),
+        };
+        $result = fakturowniaRunPreAutoloadLauncher($fixture, $launch);
+
+        expect($result['exit_code'])->toBe(78)
+            ->and($result['stdout'])->toBe('')
+            ->and($result['stderr'])->toContain('pre-autoload verification denied:')
+            ->and(\file_exists($fixture['sentinel']))->toBeFalse()
+            ->and(\file_exists($fixture['result']))->toBeFalse();
+    } finally {
+        fakturowniaPreAutoloadRemoveTree($fixture['base']);
+    }
+})->with([
+    'another compiled supervisor semantics' => 'semantics',
+    'non-canonical launch JSON' => 'canonical',
+    'truncated launch frame' => 'truncated',
+]);
 
 it('never lets the instrumented verifier execute a self-restoring autoloader after trust failure', function (string $mutation): void {
     $signedMutation = \in_array($mutation, ['runtime', 'package-set', 'unknown-schema'], true) ? $mutation : null;

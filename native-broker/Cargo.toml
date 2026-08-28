@@ -1,0 +1,46 @@
+[package]
+name = "fakturownia-native-broker"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "MIT"
+publish = false
+
+[features]
+default = ["network"]
+network = ["dep:ureq"]
+
+[dependencies]
+base64 = "0.22.1"
+ed25519-dalek = { version = "2.2.0", features = ["pkcs8", "rand_core", "zeroize"] }
+hmac = "0.12.1"
+rand = "0.8.5"
+rustix = { version = "1.1.4", features = ["fs", "process", "thread"] }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = { version = "1.0.143", features = ["preserve_order"] }
+sha2 = "0.10.9"
+subtle = "2.6.1"
+time = { version = "0.3.41", features = ["formatting", "parsing", "serde"] }
+ureq = { version = "3.1.0", default-features = false, features = ["rustls"], optional = true }
+url = "2.5.7"
+zeroize = { version = "1.8.1", features = ["derive"] }
+
+[dev-dependencies]
+tempfile = "3.21.0"
+
+[profile.release]
+codegen-units = 1
+lto = true
+panic = "abort"
+strip = true
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = "deny"
+correctness = "deny"
+suspicious = "deny"
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"

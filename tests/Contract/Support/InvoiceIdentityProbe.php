@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Cieplik206\Fakturownia\Tests\Contract\Support;
 
 use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\ConsumptionReceipt;
+use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\NativeBrokerSession;
 use DateTimeImmutable;
 use DateTimeZone;
 use GuzzleHttp\Client as GuzzleClient;
@@ -113,7 +114,7 @@ use function trim;
 use function unlink;
 use function usleep;
 
-final class InvoiceIdentityProbe implements LiveProviderTransportOrigin
+final class InvoiceIdentityProbe implements NativeBrokerProviderTransportOrigin
 {
     /** @var list<string> */
     private const RequiredScenarios = [
@@ -152,6 +153,11 @@ final class InvoiceIdentityProbe implements LiveProviderTransportOrigin
     public function assertRealProviderTransportOrigin(): void
     {
         $this->configuration->assertRealProviderTransportOrigin();
+    }
+
+    public function nativeBrokerSession(): NativeBrokerSession
+    {
+        return $this->configuration->nativeBrokerSession();
     }
 
     /**
@@ -1664,17 +1670,30 @@ final class InvoiceIdentityProbe implements LiveProviderTransportOrigin
         $failures = [];
         $startedAt = hrtime(true);
         $this->configuration->assertEffectAuthorizedNow(2);
-        $connector->pool(
-            ['first' => new CreateProbeInvoiceRequest($this->configuration->primary->token, $invoice), 'second' => new CreateProbeInvoiceRequest($this->configuration->primary->token, $invoice)],
-            2,
-            function (#[SensitiveParameter] Response $response, string|int $key) use (&$responses): void {
-                $responses[(string) $key] = $response;
-            },
-            function (#[SensitiveParameter] mixed $reason, string|int $key) use (&$failures): void {
-                $failures[(string) $key] = $reason instanceof Throwable ? $reason : new RuntimeException('Unknown pool failure.');
-            },
-        )->send()->wait();
-        $outcomes = ['first' => $responses['first'] ?? $failures['first'] ?? new RuntimeException('Missing pool outcome.'), 'second' => $responses['second'] ?? $failures['second'] ?? new RuntimeException('Missing pool outcome.')];
+        $requests = [
+            'first' => new CreateProbeInvoiceRequest($this->configuration->primary->token, $invoice),
+            'second' => new CreateProbeInvoiceRequest($this->configuration->primary->token, $invoice),
+        ];
+
+        if ($this->configuration->usesNativeBroker()) {
+            [$first, $second] = $connector->sendConcurrentSameOid($requests['first'], $requests['second']);
+            $outcomes = ['first' => $first, 'second' => $second];
+        } else {
+            $connector->pool(
+                $requests,
+                2,
+                function (#[SensitiveParameter] Response $response, string|int $key) use (&$responses): void {
+                    $responses[(string) $key] = $response;
+                },
+                function (#[SensitiveParameter] mixed $reason, string|int $key) use (&$failures): void {
+                    $failures[(string) $key] = $reason instanceof Throwable ? $reason : new RuntimeException('Unknown pool failure.');
+                },
+            )->send()->wait();
+            $outcomes = [
+                'first' => $responses['first'] ?? $failures['first'] ?? new RuntimeException('Missing pool outcome.'),
+                'second' => $responses['second'] ?? $failures['second'] ?? new RuntimeException('Missing pool outcome.'),
+            ];
+        }
         $classes = array_map(fn (#[SensitiveParameter] Response|Throwable $outcome): string => self::classify($outcome), $outcomes);
         $successfulResponseIds = array_values(array_filter(array_map(self::responseDocumentId(...), $outcomes)));
         $expectedDocumentIds = array_values(array_unique($successfulResponseIds));
@@ -2504,7 +2523,10 @@ final class InvoiceIdentityProbe implements LiveProviderTransportOrigin
                     $providerRun,
                 );
                 $published = $this->configuration->publishUnsignedEvidenceSidecar($unsignedPayload, $providerRun);
-                $canonicalUnsignedPayload = LiveEvidenceAttestationGuard::canonicalUnsignedEvidencePayload($unsignedPayload);
+                $canonicalUnsignedPayload = LiveEvidenceAttestationGuard::canonicalUnsignedEvidencePayload(
+                    $unsignedPayload,
+                    $providerRun === null ? null : $this->configuration->nativeBrokerSession(),
+                );
 
                 if (! $this->sanitizer->isSafe($canonicalUnsignedPayload)) {
                     throw new RuntimeException('Refusing to retain an unsafe unsigned evidence sidecar.');
@@ -2852,6 +2874,37 @@ final class FakturowniaProbeConnector extends Connector
         $this->sender = $responseQueue;
 
         return $this;
+    }
+
+    public function withNativeBrokerSender(
+        #[SensitiveParameter] NativeBrokerSaloonSender $nativeBrokerSender,
+    ): self {
+        self::assertMiddlewarePipelineIsEmpty($this->middleware());
+
+        if (isset($this->sender) || $this->hasMockClient()) {
+            throw new LogicException('The S0.3 connector transport may be selected only once.');
+        }
+
+        $this->sender = $nativeBrokerSender;
+
+        return $this;
+    }
+
+    /** @return array{Response|Throwable, Response|Throwable} */
+    public function sendConcurrentSameOid(
+        #[SensitiveParameter] Request $first,
+        #[SensitiveParameter] Request $second,
+    ): array {
+        $sender = $this->sender();
+
+        if (! $sender instanceof NativeBrokerSaloonSender) {
+            throw new LogicException('The exact same-OID protocol is available only through the native broker sender.');
+        }
+
+        return $sender->sendConcurrentSameOid(
+            $this->createPendingRequest($first),
+            $this->createPendingRequest($second),
+        );
     }
 
     public function withMockClient(#[SensitiveParameter] MockClient $mockClient): static

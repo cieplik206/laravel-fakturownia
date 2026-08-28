@@ -22,13 +22,23 @@ final class PreAutoloadLauncher
 
     private const EnforceRuntimeAncestorOwnership = true;
 
-    private const NativeSupervisorDeploymentAvailable = false;
+    private const TrustedAncestorRoot = '/';
 
     private const PolicyContract = 'cieplik206.fakturownia.preauthenticated-policy';
 
     private const ManifestContract = 'cieplik206.fakturownia.preauthenticated-snapshot';
 
-    private const Version = 2;
+    private const Version = 3;
+
+    private const NativeWireVersion = '1';
+
+    private const NativeLaunchContract = 'cieplik206.fakturownia.native-supervisor-launch';
+
+    private const NativeReadyContract = 'cieplik206.fakturownia.native-supervisor-ready';
+
+    private const NativeWireHeaderBytes = 9;
+
+    private const MaximumNativeWirePayloadBytes = 2_097_152;
 
     /** @var list<string> */
     private const RequiredExtensionNames = ['posix', 'sodium'];
@@ -55,8 +65,6 @@ final class PreAutoloadLauncher
 
     private const MaximumTreeBytes = 4_294_967_296;
 
-    private const MaximumSecretBytes = 4_194_304;
-
     private const SignatureBytes = \SODIUM_CRYPTO_SIGN_BYTES;
 
     private const PublicKeyBytes = \SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES;
@@ -67,24 +75,23 @@ final class PreAutoloadLauncher
         try {
             self::assertBootstrapRuntimeIsClean();
             self::clearInheritedEnvironment();
-            self::assertNativeSupervisorDeploymentAvailable(self::NativeSupervisorDeploymentAvailable);
+            self::assertSupervisedArguments($arguments);
             self::assertTrustedLauncherFile();
-
-            $input = self::parseArguments($arguments);
             $policy = self::loadPolicy();
 
             self::assertCurrentRuntimeMatchesPolicy($policy);
+            $launch = self::readSupervisedLaunch($policy);
 
-            $verified = self::verifySnapshot($policy, $input['manifest_sha256']);
+            $verified = self::verifySnapshot($policy, $launch['manifest_sha256']);
 
             // A complete second pass closes mutable-tree races before secrets are opened.
-            self::verifySnapshot($policy, $input['manifest_sha256']);
+            self::verifySnapshot($policy, $launch['manifest_sha256']);
+
+            self::writeSupervisedReady($launch);
 
             return self::executeVerifiedProbe(
                 $policy,
                 $verified,
-                $input['credential_file'],
-                $input['authorization_file'],
             );
         } catch (Throwable $throwable) {
             self::writeError("pre-autoload verification denied: {$throwable->getMessage()}\n");
@@ -152,10 +159,11 @@ final class PreAutoloadLauncher
         }
     }
 
-    private static function assertNativeSupervisorDeploymentAvailable(bool $available): void
+    /** @param list<string> $arguments */
+    private static function assertSupervisedArguments(array $arguments): void
     {
-        if (! $available) {
-            throw new RuntimeException('native root supervisor deployment is unavailable; live execution is fail-closed');
+        if (\count($arguments) !== 2 || $arguments[1] !== '--supervised') {
+            throw new RuntimeException('only the native supervisor --supervised invocation is accepted');
         }
     }
 
@@ -166,47 +174,131 @@ final class PreAutoloadLauncher
     }
 
     /**
-     * @param  list<string>  $arguments
-     * @return array{manifest_sha256: string, credential_file: string, authorization_file: string}
+     * @param  array<string, mixed>  $policy
+     * @return array{manifest_sha256: string, supervisor_semantics_sha256: string}
      */
-    private static function parseArguments(array $arguments): array
+    private static function readSupervisedLaunch(array $policy): array
     {
-        if (\count($arguments) !== 4) {
-            throw new RuntimeException('expected manifest hash, credential file, and authorization file');
+        $document = self::readNativeWireFrame();
+        self::assertExactKeys($document, [
+            'contract',
+            'version',
+            'launch_manifest_sha256',
+            'supervisor_semantics_sha256',
+        ], 'native supervisor launch');
+
+        if (($document['contract'] ?? null) !== self::NativeLaunchContract
+            || ($document['version'] ?? null) !== self::NativeWireVersion
+            || ! \is_string($document['launch_manifest_sha256'] ?? null)
+            || ! \is_string($document['supervisor_semantics_sha256'] ?? null)) {
+            throw new RuntimeException('the native supervisor launch contract is invalid');
         }
 
-        $manifestSha256 = self::argumentValue($arguments[1], '--manifest-sha256=', 64);
-        $credentialFile = self::argumentValue($arguments[2], '--credential-file=', 4_096);
-        $authorizationFile = self::argumentValue($arguments[3], '--authorization-file=', 4_096);
+        $manifestSha256 = $document['launch_manifest_sha256'];
+        $supervisorSemanticsSha256 = $document['supervisor_semantics_sha256'];
+        self::assertSha256($manifestSha256, 'native supervisor launch manifest');
+        self::assertSha256($supervisorSemanticsSha256, 'native supervisor semantics');
 
-        self::assertSha256($manifestSha256, 'manifest hash');
-        self::assertCanonicalAbsoluteInputPath($credentialFile, 'credential file');
-        self::assertCanonicalAbsoluteInputPath($authorizationFile, 'authorization file');
+        if (! \hash_equals($policy['native_supervisor_semantics_sha256'], $supervisorSemanticsSha256)) {
+            throw new RuntimeException('the native supervisor semantics do not match policy');
+        }
 
         return [
             'manifest_sha256' => $manifestSha256,
-            'credential_file' => $credentialFile,
-            'authorization_file' => $authorizationFile,
+            'supervisor_semantics_sha256' => $supervisorSemanticsSha256,
         ];
     }
 
-    private static function argumentValue(string $argument, string $prefix, int $maximumBytes): string
+    /** @param array{manifest_sha256: string, supervisor_semantics_sha256: string} $launch */
+    private static function writeSupervisedReady(array $launch): void
     {
-        if (\strlen($argument) > $maximumBytes + \strlen($prefix)) {
-            throw new RuntimeException('an argument exceeds its byte limit');
+        self::writeNativeWireFrame([
+            'contract' => self::NativeReadyContract,
+            'version' => self::NativeWireVersion,
+            'launch_manifest_sha256' => $launch['manifest_sha256'],
+            'supervisor_semantics_sha256' => $launch['supervisor_semantics_sha256'],
+        ]);
+    }
+
+    /** @return array<string, mixed> */
+    private static function readNativeWireFrame(): array
+    {
+        $header = self::readExact(\STDIN, self::NativeWireHeaderBytes);
+
+        if (\preg_match('/^[a-f0-9]{8}\n$/D', $header) !== 1) {
+            throw new RuntimeException('the native supervisor wire-frame header is invalid');
         }
 
-        if (! \str_starts_with($argument, $prefix)) {
-            throw new RuntimeException("expected {$prefix}");
+        $length = \intval(\substr($header, 0, 8), 16);
+
+        if ($length < 1 || $length > self::MaximumNativeWirePayloadBytes) {
+            throw new RuntimeException('the native supervisor wire frame exceeds its payload limit');
         }
 
-        $value = \substr($argument, \strlen($prefix));
+        $raw = self::readExact(\STDIN, $length);
+        $document = StrictJson::decode($raw, self::MaximumPolicyDepth, self::MaximumPolicyNodes);
 
-        if ($value === '') {
-            throw new RuntimeException("{$prefix} cannot be empty");
+        if (! \hash_equals($raw, CanonicalJson::encode($document))) {
+            throw new RuntimeException('the native supervisor wire frame is not canonical JSON');
+        }
+
+        return $document;
+    }
+
+    /** @param array<string, mixed> $document */
+    private static function writeNativeWireFrame(array $document): void
+    {
+        $payload = CanonicalJson::encode($document);
+
+        if ($payload === '' || \strlen($payload) > self::MaximumNativeWirePayloadBytes) {
+            throw new RuntimeException('the native supervisor wire frame exceeds its payload limit');
+        }
+
+        self::writeAll(\STDOUT, \sprintf("%08x\n", \strlen($payload)).$payload);
+
+        if (! \fflush(\STDOUT)) {
+            throw new RuntimeException('cannot flush the native supervisor wire frame');
+        }
+    }
+
+    /** @param resource $stream */
+    private static function readExact($stream, int $bytes): string
+    {
+        $value = '';
+
+        while (\strlen($value) < $bytes) {
+            $remaining = $bytes - \strlen($value);
+
+            if ($remaining < 1) {
+                break;
+            }
+
+            $chunk = \fread($stream, $remaining);
+
+            if (! \is_string($chunk) || $chunk === '') {
+                throw new RuntimeException('the native supervisor wire frame ended prematurely');
+            }
+
+            $value .= $chunk;
         }
 
         return $value;
+    }
+
+    /** @param resource $stream */
+    private static function writeAll($stream, string $value): void
+    {
+        $offset = 0;
+
+        while ($offset < \strlen($value)) {
+            $written = \fwrite($stream, \substr($value, $offset));
+
+            if (! \is_int($written) || $written < 1) {
+                throw new RuntimeException('cannot write the native supervisor wire frame');
+            }
+
+            $offset += $written;
+        }
     }
 
     /** @return array<string, mixed> */
@@ -232,6 +324,9 @@ final class PreAutoloadLauncher
             'php_extensions',
             'launcher_sha256',
             'probe_entrypoint',
+            'native_trust_policy_signer_id',
+            'native_trust_policy_public_key_base64',
+            'native_supervisor_semantics_sha256',
             'limits',
         ], 'policy');
 
@@ -248,6 +343,7 @@ final class PreAutoloadLauncher
         self::assertPhpExtensionsPolicy($policy['php_extensions']);
         self::assertSha256Value($policy['launcher_sha256'], 'policy.launcher_sha256');
         self::assertCanonicalRelativePathValue($policy['probe_entrypoint'], 'policy.probe_entrypoint', self::MaximumPathBytes);
+        self::assertNativeTrustPolicy($policy);
 
         if (! \str_starts_with($policy['probe_entrypoint'], 'tests/Contract/') || ! \str_ends_with($policy['probe_entrypoint'], '.php')) {
             throw new RuntimeException('the policy entrypoint must be a dedicated Contract PHP file');
@@ -290,6 +386,32 @@ final class PreAutoloadLauncher
         return $policy;
     }
 
+    /** @param array<string, mixed> $policy */
+    private static function assertNativeTrustPolicy(array $policy): void
+    {
+        $signerId = $policy['native_trust_policy_signer_id'] ?? null;
+        $publicKeyBase64 = $policy['native_trust_policy_public_key_base64'] ?? null;
+
+        if (! \is_string($signerId)
+            || \preg_match('/^[a-z0-9][a-z0-9._-]{0,63}$/D', $signerId) !== 1
+            || ! \is_string($publicKeyBase64)) {
+            throw new RuntimeException('the native broker trust-policy pin is invalid');
+        }
+
+        $publicKey = \base64_decode($publicKeyBase64, true);
+
+        if (! \is_string($publicKey)
+            || \strlen($publicKey) !== self::PublicKeyBytes
+            || ! \hash_equals($publicKeyBase64, \base64_encode($publicKey))) {
+            throw new RuntimeException('the native broker trust-policy public key is invalid');
+        }
+
+        self::assertSha256Value(
+            $policy['native_supervisor_semantics_sha256'] ?? null,
+            'policy.native_supervisor_semantics_sha256',
+        );
+    }
+
     private static function assertPolicyLimits(mixed $limits): void
     {
         if (! \is_array($limits)) {
@@ -305,8 +427,6 @@ final class PreAutoloadLauncher
             'path_bytes',
             'file_bytes',
             'tree_bytes',
-            'credential_bytes',
-            'authorization_bytes',
         ], 'policy.limits');
 
         self::assertBoundedPositiveInteger($limits['manifest_bytes'], self::MaximumManifestBytes, 'manifest_bytes');
@@ -317,8 +437,6 @@ final class PreAutoloadLauncher
         self::assertBoundedPositiveInteger($limits['path_bytes'], self::MaximumPathBytes, 'path_bytes');
         self::assertBoundedPositiveInteger($limits['file_bytes'], self::MaximumFileBytes, 'file_bytes');
         self::assertBoundedPositiveInteger($limits['tree_bytes'], self::MaximumTreeBytes, 'tree_bytes');
-        self::assertBoundedPositiveInteger($limits['credential_bytes'], self::MaximumSecretBytes, 'credential_bytes');
-        self::assertBoundedPositiveInteger($limits['authorization_bytes'], self::MaximumSecretBytes, 'authorization_bytes');
     }
 
     private static function assertPhpExtensionsPolicy(mixed $extensions): void
@@ -1045,84 +1163,38 @@ final class PreAutoloadLauncher
     private static function executeVerifiedProbe(
         array $policy,
         array $verified,
-        string $credentialPath,
-        string $authorizationPath,
     ): int {
-        $credential = self::openSecretAfterVerification($credentialPath, $policy['limits']['credential_bytes']);
-        $authorization = self::openSecretAfterVerification($authorizationPath, $policy['limits']['authorization_bytes']);
-
         $descriptors = [
             0 => \STDIN,
             1 => \STDOUT,
             2 => \STDERR,
-            3 => $credential,
-            4 => $authorization,
         ];
         $environment = [
             'PATH' => \dirname($policy['php_executable']),
             'LANG' => 'C',
             'LC_ALL' => 'C',
             'FAKTUROWNIA_PREAUTOLOAD_VERIFIED_MANIFEST_SHA256' => $verified['manifest_sha256'],
-            'FAKTUROWNIA_CREDENTIAL_FD' => '3',
-            'FAKTUROWNIA_AUTHORIZATION_FD' => '4',
+            'FAKTUROWNIA_NATIVE_TRUST_POLICY_SIGNER_ID' => $policy['native_trust_policy_signer_id'],
+            'FAKTUROWNIA_NATIVE_TRUST_POLICY_PUBLIC_KEY_BASE64' => $policy['native_trust_policy_public_key_base64'],
+            'FAKTUROWNIA_NATIVE_SUPERVISOR_SEMANTICS_SHA256' => $policy['native_supervisor_semantics_sha256'],
         ];
         $command = [$policy['php_executable'], ...self::runtimeArguments($policy), $verified['entrypoint']];
         $pipes = [];
 
-        try {
-            $process = \proc_open(
-                $command,
-                $descriptors,
-                $pipes,
-                $verified['snapshot'],
-                $environment,
-                ['bypass_shell' => true],
-            );
+        $process = \proc_open(
+            $command,
+            $descriptors,
+            $pipes,
+            $verified['snapshot'],
+            $environment,
+            ['bypass_shell' => true],
+        );
 
-            if (! \is_resource($process)) {
-                throw new RuntimeException('cannot execute the verified probe');
-            }
-
-            return \proc_close($process);
-        } finally {
-            \fclose($credential);
-            \fclose($authorization);
-        }
-    }
-
-    /** @return resource */
-    private static function openSecretAfterVerification(string $path, int $maximumBytes)
-    {
-        self::assertCanonicalAbsoluteInputPath($path, 'secret input');
-        $before = self::trustedLstat($path);
-
-        if (($before['mode'] & 0o170000) !== 0o100000 || $before['nlink'] !== 1) {
-            throw new RuntimeException('secret input must be a non-hardlinked regular file');
+        if (! \is_resource($process)) {
+            throw new RuntimeException('cannot execute the verified probe');
         }
 
-        if ($before['size'] < 1 || $before['size'] > $maximumBytes) {
-            throw new RuntimeException('secret input exceeds its byte bounds');
-        }
-
-        if (($before['mode'] & 0o077) !== 0) {
-            throw new RuntimeException('secret input must not be accessible by group or others');
-        }
-
-        $stream = \fopen($path, 'rb');
-
-        if ($stream === false) {
-            throw new RuntimeException('cannot open secret input');
-        }
-
-        $opened = \fstat($stream);
-
-        if (! \is_array($opened) || ! self::sameFileIdentity($before, $opened)) {
-            \fclose($stream);
-
-            throw new RuntimeException('secret input changed while opening');
-        }
-
-        return $stream;
+        return \proc_close($process);
     }
 
     private static function assertProtectedRuntimeFile(string $path, string $sha256): void
@@ -1330,31 +1402,54 @@ final class PreAutoloadLauncher
 
     private static function assertTrustedAncestors(string $path): void
     {
+        self::assertTrustedAncestorsWithin($path, self::TrustedAncestorRoot);
+    }
+
+    private static function assertTrustedAncestorsWithin(string $path, string $configuredRoot): void
+    {
         if (! \str_starts_with($path, '/')) {
             throw new RuntimeException('trusted ancestor path is not absolute');
         }
 
-        $current = '/';
+        $trustedRoot = \rtrim($configuredRoot, '/');
+        $trustedRoot = $trustedRoot === '' ? '/' : $trustedRoot;
 
-        foreach (\explode('/', \trim($path, '/')) as $part) {
+        if (! \str_starts_with($trustedRoot, '/')
+            || ($path !== $trustedRoot && ! \str_starts_with($path, $trustedRoot === '/' ? '/' : "{$trustedRoot}/"))) {
+            throw new RuntimeException('trusted ancestor path is outside the configured trust root');
+        }
+
+        self::assertTrustedAncestorDirectory($trustedRoot);
+
+        $current = $trustedRoot;
+        $relativePath = $trustedRoot === '/'
+            ? \trim($path, '/')
+            : \ltrim(\substr($path, \strlen($trustedRoot)), '/');
+
+        foreach (\explode('/', $relativePath) as $part) {
             if ($part === '') {
                 continue;
             }
 
             $current = $current === '/' ? "/{$part}" : "{$current}/{$part}";
-            $stat = self::trustedLstat($current);
+            self::assertTrustedAncestorDirectory($current);
+        }
+    }
 
-            if (($stat['mode'] & 0o170000) !== 0o040000) {
-                throw new RuntimeException('a trusted ancestor is not a directory');
-            }
+    private static function assertTrustedAncestorDirectory(string $path): void
+    {
+        $stat = self::trustedLstat($path);
 
-            if (! self::isTrustedAncestorOwner($stat['uid'], self::TrustedOwnerUid)) {
-                throw new RuntimeException('a trusted ancestor has an unexpected owner');
-            }
+        if (($stat['mode'] & 0o170000) !== 0o040000) {
+            throw new RuntimeException('a trusted ancestor is not a directory');
+        }
 
-            if (($stat['mode'] & 0o022) !== 0) {
-                throw new RuntimeException('a trusted ancestor is writable by group or others');
-            }
+        if (! self::isTrustedAncestorOwner($stat['uid'], self::TrustedOwnerUid)) {
+            throw new RuntimeException('a trusted ancestor has an unexpected owner');
+        }
+
+        if (($stat['mode'] & 0o022) !== 0) {
+            throw new RuntimeException('a trusted ancestor is writable by group or others');
         }
     }
 

@@ -78,6 +78,7 @@ final readonly class LiveEffectDescriptor implements JsonSerializable
         public string $effectId,
         public int $effectSequence,
         public string $profile,
+        public string $targetKey,
         public string $capability,
         public string $semanticEffect,
         public string $httpMethod,
@@ -92,6 +93,8 @@ final readonly class LiveEffectDescriptor implements JsonSerializable
         public string $supervisorAttestationSha256,
         public string $brokerPolicySha256,
         public string $authorizationSetSha256,
+        public string $authorizationBundleSha256,
+        public string $probePlanSha256,
         public string $claimRequestSha256,
         public string $consumptionReceiptSha256,
         public string $claimNonce,
@@ -112,6 +115,7 @@ final readonly class LiveEffectDescriptor implements JsonSerializable
             'effect_id',
             'effect_sequence',
             'profile',
+            'target_key',
             'capability',
             'semantic_effect',
             'http_method',
@@ -126,6 +130,8 @@ final readonly class LiveEffectDescriptor implements JsonSerializable
             'supervisor_attestation_sha256',
             'broker_policy_sha256',
             'authorization_set_sha256',
+            'authorization_bundle_sha256',
+            'probe_plan_sha256',
             'claim_request_sha256',
             'consumption_receipt_sha256',
             'claim_nonce',
@@ -146,6 +152,7 @@ final readonly class LiveEffectDescriptor implements JsonSerializable
             self::string($value, 'effect_id'),
             self::integer($value, 'effect_sequence'),
             self::string($value, 'profile'),
+            self::string($value, 'target_key'),
             self::string($value, 'capability'),
             self::string($value, 'semantic_effect'),
             self::string($value, 'http_method'),
@@ -160,6 +167,8 @@ final readonly class LiveEffectDescriptor implements JsonSerializable
             self::string($value, 'supervisor_attestation_sha256'),
             self::string($value, 'broker_policy_sha256'),
             self::string($value, 'authorization_set_sha256'),
+            self::string($value, 'authorization_bundle_sha256'),
+            self::string($value, 'probe_plan_sha256'),
             self::string($value, 'claim_request_sha256'),
             self::string($value, 'consumption_receipt_sha256'),
             self::string($value, 'claim_nonce'),
@@ -184,6 +193,7 @@ final readonly class LiveEffectDescriptor implements JsonSerializable
             'effect_id' => $this->effectId,
             'effect_sequence' => $this->effectSequence,
             'profile' => $this->profile,
+            'target_key' => $this->targetKey,
             'capability' => $this->capability,
             'semantic_effect' => $this->semanticEffect,
             'http_method' => $this->httpMethod,
@@ -198,6 +208,8 @@ final readonly class LiveEffectDescriptor implements JsonSerializable
             'supervisor_attestation_sha256' => $this->supervisorAttestationSha256,
             'broker_policy_sha256' => $this->brokerPolicySha256,
             'authorization_set_sha256' => $this->authorizationSetSha256,
+            'authorization_bundle_sha256' => $this->authorizationBundleSha256,
+            'probe_plan_sha256' => $this->probePlanSha256,
             'claim_request_sha256' => $this->claimRequestSha256,
             'consumption_receipt_sha256' => $this->consumptionReceiptSha256,
             'claim_nonce' => $this->claimNonce,
@@ -262,6 +274,7 @@ final readonly class LiveEffectDescriptor implements JsonSerializable
         }
 
         $operation = $this->matchingOperation();
+        $this->assertTargetKey();
 
         if ($this->effectSequence < 1
             || $this->effectSequence > $operation['maximum_effect_sequence']) {
@@ -280,6 +293,8 @@ final readonly class LiveEffectDescriptor implements JsonSerializable
             'supervisor attestation' => $this->supervisorAttestationSha256,
             'broker policy' => $this->brokerPolicySha256,
             'authorization set' => $this->authorizationSetSha256,
+            'authorization bundle' => $this->authorizationBundleSha256,
+            'probe plan' => $this->probePlanSha256,
             'claim request' => $this->claimRequestSha256,
             'consumption receipt' => $this->consumptionReceiptSha256,
         ] as $label => $digest) {
@@ -337,6 +352,20 @@ final readonly class LiveEffectDescriptor implements JsonSerializable
         }
 
         throw new InvalidArgumentException('The live-effect operation tuple is not allowlisted.');
+    }
+
+    private function assertTargetKey(): void
+    {
+        $valid = $this->evidenceContract === SignedLiveProbeAuthorization::InvoiceIdentityEvidenceContract
+            && $this->profile === 'invoice_identity'
+            && \in_array($this->targetKey, ['primary', 'secondary'], true);
+        $valid = $valid || ($this->evidenceContract === SignedLiveProbeAuthorization::KsefDemoEvidenceContract
+            && \in_array($this->profile, ['explicit_block', 'explicit_persist', 'auto_block', 'auto_persist'], true)
+            && \hash_equals($this->profile, $this->targetKey));
+
+        if (! $valid) {
+            throw new InvalidArgumentException('The live-effect target is not allowlisted for its profile.');
+        }
     }
 
     private static function assertUtcMicrosecondInstant(string $value): void

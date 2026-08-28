@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Cieplik206\Fakturownia\Tests\Contract\Support;
 
+use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\BrokeredEffectDisposition;
+use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\BrokeredEffectExecutionReceipt;
 use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\CanonicalCodec;
 use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\ClaimCursor;
 use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\ConsumptionAuthority;
@@ -12,6 +14,9 @@ use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\ConsumptionDisposition;
 use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\ConsumptionReceipt;
 use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\ConsumptionReceiptEnvelope;
 use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\FreshClaimGrant;
+use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\NativeBrokerSession;
+use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\NativeBrokerTrustPolicy;
+use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\NativeSupervisorAttestation;
 use Cieplik206\Fakturownia\ContractTesting\LiveEvidence\SignedLiveProbeAuthorization;
 use Composer\InstalledVersions;
 use Composer\Semver\VersionParser;
@@ -163,8 +168,22 @@ final class LiveEvidenceAttestationGuard
             'tests/Contract/Support/ProbeConfiguration.php',
             'tests/Contract/Support/InvoiceIdentityProbe.php',
             'tests/Contract/Support/LiveEvidenceAttestationGuard.php',
+            'tests/Contract/Support/NativeBrokerProviderTransportOrigin.php',
+            'tests/Contract/Support/NativeBrokerSaloonSender.php',
+            'tests/Contract/LiveEvidenceProbeEntrypoint.php',
             'bin/fakturownia-live-evidence-launcher.php',
+            'src/ContractTesting/LiveEvidence/BrokeredEffectDisposition.php',
+            'src/ContractTesting/LiveEvidence/BrokeredEffectExecutionProposal.php',
+            'src/ContractTesting/LiveEvidence/BrokeredEffectExecutionReceipt.php',
+            'src/ContractTesting/LiveEvidence/BrokeredEffectExecutionResponse.php',
+            'src/ContractTesting/LiveEvidence/BrokeredEffectExecutionResult.php',
+            'src/ContractTesting/LiveEvidence/BrokeredEffectExecutionResultVerifier.php',
             'src/ContractTesting/LiveEvidence/BrokeredExecutionRequiredException.php',
+            'src/ContractTesting/LiveEvidence/BrokeredReadObservationDisposition.php',
+            'src/ContractTesting/LiveEvidence/BrokeredReadObservationProposal.php',
+            'src/ContractTesting/LiveEvidence/BrokeredReadObservationResponse.php',
+            'src/ContractTesting/LiveEvidence/BrokeredReadObservationResult.php',
+            'src/ContractTesting/LiveEvidence/BrokeredReadObservationResultVerifier.php',
             'src/ContractTesting/LiveEvidence/CanonicalCodec.php',
             'src/ContractTesting/LiveEvidence/ClaimCursor.php',
             'src/ContractTesting/LiveEvidence/ConsumptionAuthority.php',
@@ -177,6 +196,16 @@ final class LiveEvidenceAttestationGuard
             'src/ContractTesting/LiveEvidence/LiveProbeAuthorizationBatch.php',
             'src/ContractTesting/LiveEvidence/LiveProbeAuthorizationBatchAggregator.php',
             'src/ContractTesting/LiveEvidence/LiveProbeAuthorizationVerifier.php',
+            'src/ContractTesting/LiveEvidence/ConcurrentBrokeredEffectExecutionProposal.php',
+            'src/ContractTesting/LiveEvidence/ConcurrentBrokeredEffectExecutionResponse.php',
+            'src/ContractTesting/LiveEvidence/NativeBrokerAuthorityHandoff.php',
+            'src/ContractTesting/LiveEvidence/NativeBrokerProbePlan.php',
+            'src/ContractTesting/LiveEvidence/NativeBrokerSession.php',
+            'src/ContractTesting/LiveEvidence/NativeBrokerTrustPolicy.php',
+            'src/ContractTesting/LiveEvidence/NativeBrokerWireFrame.php',
+            'src/ContractTesting/LiveEvidence/NativeBrokerWireValidation.php',
+            'src/ContractTesting/LiveEvidence/NativeSupervisorAttestation.php',
+            'src/ContractTesting/LiveEvidence/NativeSupervisorAttestationVerifier.php',
             'src/ContractTesting/LiveEvidence/PendingLiteralRemoteConsumptionClaim.php',
             'src/ContractTesting/LiveEvidence/PinnedLiveProbeTrustStore.php',
             'src/ContractTesting/LiveEvidence/PinnedRepositorySnapshotReader.php',
@@ -207,8 +236,22 @@ final class LiveEvidenceAttestationGuard
             'tests/Contract/Support/KsefDemoProbeConfiguration.php',
             'tests/Contract/Support/KsefDemoContractProbe.php',
             'tests/Contract/Support/LiveEvidenceAttestationGuard.php',
+            'tests/Contract/Support/NativeBrokerProviderTransportOrigin.php',
+            'tests/Contract/Support/NativeBrokerSaloonSender.php',
+            'tests/Contract/LiveEvidenceProbeEntrypoint.php',
             'bin/fakturownia-live-evidence-launcher.php',
+            'src/ContractTesting/LiveEvidence/BrokeredEffectDisposition.php',
+            'src/ContractTesting/LiveEvidence/BrokeredEffectExecutionProposal.php',
+            'src/ContractTesting/LiveEvidence/BrokeredEffectExecutionReceipt.php',
+            'src/ContractTesting/LiveEvidence/BrokeredEffectExecutionResponse.php',
+            'src/ContractTesting/LiveEvidence/BrokeredEffectExecutionResult.php',
+            'src/ContractTesting/LiveEvidence/BrokeredEffectExecutionResultVerifier.php',
             'src/ContractTesting/LiveEvidence/BrokeredExecutionRequiredException.php',
+            'src/ContractTesting/LiveEvidence/BrokeredReadObservationDisposition.php',
+            'src/ContractTesting/LiveEvidence/BrokeredReadObservationProposal.php',
+            'src/ContractTesting/LiveEvidence/BrokeredReadObservationResponse.php',
+            'src/ContractTesting/LiveEvidence/BrokeredReadObservationResult.php',
+            'src/ContractTesting/LiveEvidence/BrokeredReadObservationResultVerifier.php',
             'src/ContractTesting/LiveEvidence/CanonicalCodec.php',
             'src/ContractTesting/LiveEvidence/ClaimCursor.php',
             'src/ContractTesting/LiveEvidence/ConsumptionAuthority.php',
@@ -221,6 +264,16 @@ final class LiveEvidenceAttestationGuard
             'src/ContractTesting/LiveEvidence/LiveProbeAuthorizationBatch.php',
             'src/ContractTesting/LiveEvidence/LiveProbeAuthorizationBatchAggregator.php',
             'src/ContractTesting/LiveEvidence/LiveProbeAuthorizationVerifier.php',
+            'src/ContractTesting/LiveEvidence/ConcurrentBrokeredEffectExecutionProposal.php',
+            'src/ContractTesting/LiveEvidence/ConcurrentBrokeredEffectExecutionResponse.php',
+            'src/ContractTesting/LiveEvidence/NativeBrokerAuthorityHandoff.php',
+            'src/ContractTesting/LiveEvidence/NativeBrokerProbePlan.php',
+            'src/ContractTesting/LiveEvidence/NativeBrokerSession.php',
+            'src/ContractTesting/LiveEvidence/NativeBrokerTrustPolicy.php',
+            'src/ContractTesting/LiveEvidence/NativeBrokerWireFrame.php',
+            'src/ContractTesting/LiveEvidence/NativeBrokerWireValidation.php',
+            'src/ContractTesting/LiveEvidence/NativeSupervisorAttestation.php',
+            'src/ContractTesting/LiveEvidence/NativeSupervisorAttestationVerifier.php',
             'src/ContractTesting/LiveEvidence/PendingLiteralRemoteConsumptionClaim.php',
             'src/ContractTesting/LiveEvidence/PinnedLiveProbeTrustStore.php',
             'src/ContractTesting/LiveEvidence/PinnedRepositorySnapshotReader.php',
@@ -373,6 +426,7 @@ final class LiveEvidenceAttestationGuard
      * @param  array<string, mixed>  $fixture
      * @param  array<string, string>|null  $trustedSigners
      * @param  array<string, string>|null  $trustedConsumptionAuthorities
+     * @param  array<string, string>|null  $trustedNativeBrokerPolicies
      * @return array<string, mixed>
      */
     public static function assertHistoricalEvidence(
@@ -388,6 +442,7 @@ final class LiveEvidenceAttestationGuard
         int $maximumSigningDelaySeconds,
         ?array $trustedSigners = null,
         ?array $trustedConsumptionAuthorities = null,
+        ?array $trustedNativeBrokerPolicies = null,
     ): array {
         return self::assertHistoricalEvidenceInternal(
             $signedDocument,
@@ -405,6 +460,7 @@ final class LiveEvidenceAttestationGuard
             true,
             self::EvidenceContract,
             true,
+            $trustedNativeBrokerPolicies,
         );
     }
 
@@ -417,6 +473,7 @@ final class LiveEvidenceAttestationGuard
      * @param  array<string, mixed>  $fixture
      * @param  array<string, string>  $trustedSigners
      * @param  array<string, string>  $trustedConsumptionAuthorities
+     * @param  array<string, string>|null  $trustedNativeBrokerPolicies
      * @return array<string, mixed>
      */
     public static function assertHistoricalEvidenceSignatures(
@@ -431,6 +488,7 @@ final class LiveEvidenceAttestationGuard
         int $maximumSigningDelaySeconds,
         array $trustedSigners,
         array $trustedConsumptionAuthorities,
+        ?array $trustedNativeBrokerPolicies = null,
     ): array {
         if ($trustedSigners === []) {
             throw new InvalidArgumentException('The historical evidence test seam requires an explicit non-empty signer map.');
@@ -452,6 +510,7 @@ final class LiveEvidenceAttestationGuard
             false,
             self::EvidenceContract,
             true,
+            $trustedNativeBrokerPolicies,
         );
     }
 
@@ -499,6 +558,7 @@ final class LiveEvidenceAttestationGuard
             false,
             self::TestEvidenceContract,
             false,
+            null,
         );
     }
 
@@ -508,6 +568,7 @@ final class LiveEvidenceAttestationGuard
      * @param  array<string, mixed>  $fixture
      * @param  array<string, string>|null  $trustedSigners
      * @param  array<string, string>|null  $trustedConsumptionAuthorities
+     * @param  array<string, string>|null  $trustedNativeBrokerPolicies
      * @return array<string, mixed>
      */
     private static function assertHistoricalEvidenceInternal(
@@ -526,6 +587,7 @@ final class LiveEvidenceAttestationGuard
         bool $verifyHarness,
         string $expectedEvidenceContract,
         bool $requireLiveOrigins,
+        ?array $trustedNativeBrokerPolicies,
     ): array {
         $trustedSigners ??= self::loadTrustedSigners(requiredRole: 'operator_attestation');
         $trustedConsumptionAuthorities ??= self::loadTrustedSigners(requiredRole: 'consumption_authority');
@@ -537,7 +599,18 @@ final class LiveEvidenceAttestationGuard
             $maximumEvidenceTtlSeconds,
             $trustedSigners,
         );
-        self::assertEvidenceEnvelopeShape($envelope, $expectedEvidenceContract, $requireLiveOrigins);
+        $nativeBrokerTrustPolicy = $requireLiveOrigins
+            ? self::verifyHistoricalNativeBrokerTrustPolicy(
+                $envelope,
+                $trustedNativeBrokerPolicies,
+            )
+            : null;
+        self::assertEvidenceEnvelopeShape(
+            $envelope,
+            $expectedEvidenceContract,
+            $requireLiveOrigins,
+            $nativeBrokerTrustPolicy,
+        );
         $envelopeRunStartedAt = self::strictUtcDate($envelope['run']['started_at']);
         $envelopeRunFinishedAt = self::strictUtcDate($envelope['run']['finished_at']);
         $runMicroseconds = self::instantMicroseconds($runFinishedAt) - self::instantMicroseconds($runStartedAt);
@@ -973,7 +1046,36 @@ final class LiveEvidenceAttestationGuard
         string $evidenceContract,
         string $environment,
     ): LiveProviderRunHandle {
-        throw new RuntimeException('A PHP provider run cannot execute live effects; the native one-shot broker is not provisioned.');
+        if (! $provider instanceof NativeBrokerProviderTransportOrigin) {
+            throw new RuntimeException('A PHP provider run cannot execute live effects; the native one-shot broker is required.');
+        }
+
+        $provider->assertRealProviderTransportOrigin();
+        $authority = $provider->nativeBrokerSession()->authority;
+
+        if (! hash_equals($authority->evidenceContract, $evidenceContract)
+            || ! hash_equals($authority->probePlan->environment(), $environment)) {
+            throw new InvalidArgumentException('The native provider run does not match the requested evidence contract and environment.');
+        }
+
+        $startedAt = self::systemUtcNow();
+        $startedMonotonicNanoseconds = self::monotonicNanoseconds();
+        $issuer = \Closure::bind(
+            static fn (): LiveProviderRunHandle => new LiveProviderRunHandle,
+            null,
+            LiveProviderRunHandle::class,
+        );
+        $handle = $issuer();
+        self::liveProviderRunHandleRegistry()[$handle] = [
+            'evidence_contract' => $evidenceContract,
+            'environment' => $environment,
+            'launch_manifest_sha256' => $authority->supervisorAttestation->launchManifestSha256,
+            'claim_request_sha256' => $authority->claimRequestSha256,
+            'started_at' => self::canonicalUtc($startedAt),
+            'started_monotonic_nanoseconds' => $startedMonotonicNanoseconds,
+        ];
+
+        return $handle;
     }
 
     /** Completes a real provider run using internal wall and monotonic clocks. */
@@ -1191,6 +1293,7 @@ final class LiveEvidenceAttestationGuard
      * @param  array<string, mixed>  $localConsumptionObservation
      * @param  list<array<string, string>>  $authorizations
      * @param  array<string, mixed>  $commitments
+     * @param  list<array<string, mixed>>  $effectExecutionReceipts
      * @return array<string, mixed>
      */
     public static function buildLiveUnsignedEvidencePayload(
@@ -1206,8 +1309,75 @@ final class LiveEvidenceAttestationGuard
         array $localConsumptionObservation,
         array $authorizations,
         array $commitments,
+        array $effectExecutionReceipts = [],
+        #[\SensitiveParameter] ?NativeBrokerSession $nativeBrokerSession = null,
     ): array {
-        throw new RuntimeException('Canonical live evidence requires supervisor-signed brokered effect-execution receipts.');
+        if (! $nativeBrokerSession instanceof NativeBrokerSession) {
+            throw new RuntimeException('Canonical live evidence requires a pinned native broker session.');
+        }
+
+        self::harnessManifest($evidenceContract);
+        $claimRequest = self::assertPinnedRemoteGrantForLiveEvidence($authorityGrant, $signedAuthorizations);
+        $providerContext = self::assertVerifiedLiveProviderRun($providerRun, $evidenceContract);
+        $authority = $nativeBrokerSession->authority;
+
+        if (! hash_equals(self::canonicalJson($authorityGrant->toArray()), self::canonicalJson($authority->consumptionReceipt))
+            || ! hash_equals($claimRequest->sha256(), $authority->claimRequestSha256)
+            || ! hash_equals($providerContext['claim_request_sha256'], $authority->claimRequestSha256)
+            || ! hash_equals($providerContext['launch_manifest_sha256'], $authority->supervisorAttestation->launchManifestSha256)
+            || ! hash_equals($authority->evidenceContract, $evidenceContract)) {
+            throw new InvalidArgumentException('Canonical live evidence does not bind the exact native broker authority.');
+        }
+
+        $claimedAt = self::strictUtcDate((string) ($localConsumptionObservation['claimed_at'] ?? ''));
+        $expectedLocalConsumption = self::buildConsumptionReceipt($signedAuthorizations, $claimedAt);
+
+        if (! hash_equals(
+            self::canonicalJson($localConsumptionObservation),
+            self::canonicalJson($expectedLocalConsumption),
+        )) {
+            throw new InvalidArgumentException('Canonical live evidence has a forged local consumption observation.');
+        }
+
+        self::assertLiveEffectExecutionReceipts(
+            $effectExecutionReceipts,
+            $nativeBrokerSession,
+            $providerContext,
+        );
+
+        $testPayload = self::buildUnsignedEvidencePayload(
+            $evidenceContract,
+            $fixturePath,
+            $fixtureSha256,
+            $repositoryCommit,
+            $codeSha256,
+            $providerContext['launch_manifest_sha256'],
+            $archivedHarness,
+            self::strictUtcDate($providerContext['started_at']),
+            self::strictUtcDate($providerContext['finished_at']),
+            $providerContext['environment'],
+            [
+                'local_claim' => $localConsumptionObservation,
+                'authority_receipt' => $authorityGrant->toArray(),
+                'effect_execution_receipts' => $effectExecutionReceipts,
+            ],
+            $authorizations,
+            $commitments,
+        );
+        $payload = [
+            ...$testPayload,
+            'contract' => self::EvidencePayloadContract,
+            'origins' => self::liveRuntimeOrigins(
+                $authorityGrant,
+                $claimRequest,
+                $providerContext,
+                $fixtureSha256,
+                $nativeBrokerSession,
+            ),
+        ];
+        self::assertEvidencePayloadShape($payload, $nativeBrokerSession);
+
+        return $payload;
     }
 
     /**
@@ -1221,9 +1391,14 @@ final class LiveEvidenceAttestationGuard
         array $payload,
         string $signerId,
         int $ttlSeconds,
+        #[\SensitiveParameter] ?NativeBrokerSession $nativeBrokerSession = null,
     ): array {
         if (($payload['contract'] ?? null) !== self::EvidencePayloadContract) {
             throw new InvalidArgumentException('The production signer accepts only dual-origin live evidence payloads.');
+        }
+
+        if (! $nativeBrokerSession instanceof NativeBrokerSession) {
+            throw new RuntimeException('The production signer requires the verified native broker session that produced the receipts.');
         }
 
         $issuedAt = self::systemUtcNow();
@@ -1233,6 +1408,7 @@ final class LiveEvidenceAttestationGuard
             $signerId,
             $issuedAt,
             $issuedAt->modify('+'.$ttlSeconds.' seconds'),
+            $nativeBrokerSession,
         );
     }
 
@@ -1265,8 +1441,9 @@ final class LiveEvidenceAttestationGuard
         string $signerId,
         DateTimeImmutable $issuedAt,
         DateTimeImmutable $expiresAt,
+        #[\SensitiveParameter] ?NativeBrokerSession $nativeBrokerSession = null,
     ): array {
-        self::assertEvidencePayloadShape($payload);
+        self::assertEvidencePayloadShape($payload, $nativeBrokerSession);
         $finishedAt = self::strictUtcDate($payload['run']['finished_at']);
         $issuedTimestamp = self::instantMicroseconds($issuedAt);
         $expiresTimestamp = self::instantMicroseconds($expiresAt);
@@ -1305,6 +1482,7 @@ final class LiveEvidenceAttestationGuard
             $envelope,
             $isLive ? self::EvidenceContract : self::TestEvidenceContract,
             $isLive,
+            $nativeBrokerSession?->authority->trustPolicy,
         );
 
         return $envelope;
@@ -1400,6 +1578,81 @@ final class LiveEvidenceAttestationGuard
         int $maximumReceiptTtlSeconds,
     ): VerifiedFreshClaimGrant {
         throw new RuntimeException('A CAS grant cannot open a mutating effect; a supervisor-signed brokered execution receipt is required.');
+    }
+
+    /**
+     * Brands only the authority already verified by a pinned native supervisor
+     * session. Each provider mutation still needs its own signed broker result.
+     */
+    public static function acceptNativeBrokerAuthority(
+        #[\SensitiveParameter] NativeBrokerSession $session,
+        DateTimeImmutable $observedAt,
+    ): VerifiedFreshClaimGrant {
+        $authorizations = $session->authority->signedAuthorizations;
+
+        foreach ($authorizations as $document) {
+            $authorization = SignedLiveProbeAuthorization::fromArray($document);
+
+            if ($authorization->issuedAtInstant() > $observedAt
+                || $authorization->expiresAtInstant() <= $observedAt) {
+                throw new InvalidArgumentException('A native broker authorization is not valid at the claim boundary.');
+            }
+        }
+
+        $receipt = ConsumptionReceipt::fromArray($session->authority->consumptionReceipt);
+        $grant = new FreshClaimGrant($receipt);
+
+        if (! hash_equals($receipt->envelope->claimRequest->sha256(), $session->authority->claimRequestSha256)) {
+            throw new InvalidArgumentException('The native broker claim does not match its verified authority handoff.');
+        }
+
+        return self::brandVerifiedFreshClaimGrant(
+            $grant,
+            'pinned_remote',
+            $authorizations,
+            $receipt->envelope->claimRequest,
+            $observedAt,
+        );
+    }
+
+    public static function assertNativeBrokerAuthorityAtEffectBoundary(
+        VerifiedFreshClaimGrant $grant,
+        #[\SensitiveParameter] NativeBrokerSession $session,
+        DateTimeImmutable $observedAt,
+        int $minimumAuthorizationRemainingSeconds,
+    ): VerifiedFreshClaimGrant {
+        if ($minimumAuthorizationRemainingSeconds < 1) {
+            throw new InvalidArgumentException('The native effect boundary requires a positive authorization window.');
+        }
+
+        $authority = $session->authority;
+        $claimRequest = ConsumptionReceipt::fromArray($authority->consumptionReceipt)->envelope->claimRequest;
+        self::assertRegisteredVerifiedFreshGrant(
+            $grant,
+            'pinned_remote',
+            $authority->signedAuthorizations,
+            $claimRequest,
+            $observedAt,
+        );
+        $authority->trustPolicy->assertValidAt($observedAt);
+        $attestationExpiresAt = self::strictUtcDate($authority->supervisorAttestation->expiresAt);
+
+        if (self::instantMicroseconds($attestationExpiresAt) - self::instantMicroseconds($observedAt)
+            < $minimumAuthorizationRemainingSeconds * 1_000_000) {
+            throw new RuntimeException('The native supervisor attestation expires before the next bounded effect can finish.');
+        }
+
+        foreach ($authority->signedAuthorizations as $document) {
+            $authorization = SignedLiveProbeAuthorization::fromArray($document);
+
+            if ($authorization->issuedAtInstant() > $observedAt
+                || self::instantMicroseconds($authorization->expiresAtInstant()) - self::instantMicroseconds($observedAt)
+                    < $minimumAuthorizationRemainingSeconds * 1_000_000) {
+                throw new RuntimeException('A native operator authorization expires before the next bounded effect can finish.');
+            }
+        }
+
+        return $grant;
     }
 
     /**
@@ -2000,9 +2253,11 @@ final class LiveEvidenceAttestationGuard
     }
 
     /** @param array<string, mixed> $payload */
-    public static function canonicalUnsignedEvidencePayload(array $payload): string
-    {
-        self::assertEvidencePayloadShape($payload);
+    public static function canonicalUnsignedEvidencePayload(
+        array $payload,
+        #[\SensitiveParameter] ?NativeBrokerSession $nativeBrokerSession = null,
+    ): string {
+        self::assertEvidencePayloadShape($payload, $nativeBrokerSession);
 
         return self::canonicalJson($payload);
     }
@@ -2137,15 +2392,123 @@ final class LiveEvidenceAttestationGuard
         VerifiedFreshClaimGrant $authorityGrant,
         VerifiedLiveProviderRun $providerRun,
         int $maximumAuthorizationTtlSeconds,
+        #[\SensitiveParameter] NativeBrokerSession $nativeBrokerSession,
     ): array {
         self::assertLivePayloadMatchesRuntimeBrands(
             $payload,
             $signedAuthorizations,
             $authorityGrant,
             $providerRun,
+            $nativeBrokerSession,
         );
 
-        throw new RuntimeException('Canonical live sidecar publication requires supervisor-signed brokered effect-execution receipts.');
+        if ($maximumAuthorizationTtlSeconds < 1) {
+            throw new InvalidArgumentException('The live sidecar authorization TTL bound must be positive.');
+        }
+
+        $root = realpath($repositoryRoot);
+        $fixturePath = $payload['evidence']['fixture_path'] ?? null;
+
+        if ($root === false
+            || ! is_dir($root)
+            || is_link($repositoryRoot)
+            || ! is_string($fixturePath)
+            || ! self::isContractFixturePath($fixturePath)) {
+            throw new RuntimeException('The live sidecar repository or fixture path is invalid.');
+        }
+
+        $fixtureContents = self::readRepositoryFile($root, $fixturePath);
+
+        if (! hash_equals((string) $payload['evidence']['fixture_sha256'], hash('sha256', $fixtureContents))) {
+            throw new InvalidArgumentException('The live sidecar fixture changed before publication.');
+        }
+
+        $baseRelativePath = substr($fixturePath, 0, -5);
+        $authorizationReferences = [];
+        $artifacts = [];
+
+        foreach ($signedAuthorizations as $signedAuthorization) {
+            $authorization = $signedAuthorization['envelope'] ?? null;
+
+            if (! is_array($authorization)) {
+                throw new InvalidArgumentException('A live sidecar authorization is missing its envelope.');
+            }
+
+            self::assertAuthorizationEnvelopeShape($authorization);
+            $issuedAt = self::strictUtcDate($authorization['issued_at']);
+            $expiresAt = self::strictUtcDate($authorization['expires_at']);
+
+            if (self::instantMicroseconds($expiresAt) - self::instantMicroseconds($issuedAt) > $maximumAuthorizationTtlSeconds * 1_000_000) {
+                throw new InvalidArgumentException('A live sidecar authorization exceeds its bounded TTL.');
+            }
+
+            $profile = $authorization['target']['profile'];
+            $sha256 = self::signedDocumentSha256($signedAuthorization);
+
+            if (isset($authorizationReferences[$profile])) {
+                throw new InvalidArgumentException('The live sidecar repeats an authorization profile.');
+            }
+
+            $authorizationReferences[$profile] = [
+                'profile' => $profile,
+                'challenge' => $authorization['challenge'],
+                'sha256' => $sha256,
+            ];
+            $artifacts[] = [
+                'path' => $root.'/'.$baseRelativePath.'.authorization-'.$profile.'.json',
+                'contents' => self::canonicalJson($signedAuthorization),
+            ];
+        }
+
+        $expectedReferences = [];
+
+        foreach ($payload['authorizations'] as $reference) {
+            if (! is_array($reference) || ! is_string($reference['profile'] ?? null)) {
+                throw new InvalidArgumentException('A live sidecar authorization reference is invalid.');
+            }
+
+            $expectedReference = $authorizationReferences[$reference['profile']] ?? null;
+
+            if (! is_array($expectedReference)) {
+                throw new InvalidArgumentException('A referenced live sidecar authorization document is missing.');
+            }
+
+            $expectedReferences[] = $expectedReference;
+        }
+
+        if (! hash_equals(
+            self::canonicalJson(['authorizations' => $payload['authorizations']]),
+            self::canonicalJson(['authorizations' => $expectedReferences]),
+        )) {
+            throw new InvalidArgumentException('The live sidecar does not contain the exact referenced authorization set.');
+        }
+
+        $unsignedPath = $root.'/'.$baseRelativePath.'.attestation.unsigned.json';
+        $artifacts[] = [
+            'path' => $unsignedPath,
+            'contents' => self::canonicalJson($payload),
+        ];
+        $publishedPaths = [];
+
+        try {
+            foreach ($artifacts as $artifact) {
+                self::writeExclusiveEvidenceArtifact($artifact['path'], $artifact['contents']);
+                $publishedPaths[] = $artifact['path'];
+            }
+        } catch (\Throwable $exception) {
+            foreach (array_reverse($publishedPaths) as $publishedPath) {
+                if (is_file($publishedPath) && ! is_link($publishedPath)) {
+                    unlink($publishedPath);
+                }
+            }
+
+            throw $exception;
+        }
+
+        return [
+            'unsigned_path' => $unsignedPath,
+            'authorization_paths' => array_slice($publishedPaths, 0, -1),
+        ];
     }
 
     /** @return list<string> */
@@ -2925,8 +3288,10 @@ final class LiveEvidenceAttestationGuard
     }
 
     /** @param array<string, mixed> $payload */
-    private static function assertEvidencePayloadShape(array $payload): void
-    {
+    private static function assertEvidencePayloadShape(
+        array $payload,
+        #[\SensitiveParameter] ?NativeBrokerSession $nativeBrokerSession = null,
+    ): void {
         $isLive = ($payload['contract'] ?? null) === self::EvidencePayloadContract;
         $isTest = ($payload['contract'] ?? null) === self::TestEvidencePayloadContract;
         $expectedKeys = [
@@ -2952,6 +3317,14 @@ final class LiveEvidenceAttestationGuard
             throw new InvalidArgumentException('The unsigned post-run evidence payload has an invalid exact contract.');
         }
 
+        if ($isLive) {
+            if (! $nativeBrokerSession instanceof NativeBrokerSession) {
+                throw new RuntimeException('A canonical unsigned live payload requires its verified native broker session.');
+            }
+
+            self::assertLivePayloadMatchesNativeSession($payload, $nativeBrokerSession);
+        }
+
         $finishedAt = self::strictUtcDate($payload['run']['finished_at']);
         $utc = new DateTimeZone('UTC');
         self::assertEvidenceEnvelopeShape([
@@ -2968,7 +3341,280 @@ final class LiveEvidenceAttestationGuard
             'authorizations' => $payload['authorizations'],
             'commitments' => $payload['commitments'],
             ...($isLive ? ['origins' => $payload['origins']] : []),
-        ], $isLive ? self::EvidenceContract : self::TestEvidenceContract, $isLive);
+        ],
+            $isLive ? self::EvidenceContract : self::TestEvidenceContract,
+            $isLive,
+            $nativeBrokerSession?->authority->trustPolicy,
+        );
+    }
+
+    /** @param array<string, mixed> $payload */
+    private static function assertLivePayloadMatchesNativeSession(
+        array $payload,
+        #[\SensitiveParameter] NativeBrokerSession $session,
+    ): void {
+        $authority = $session->authority;
+        $origins = $payload['origins'] ?? null;
+        $consumption = $payload['consumption'] ?? null;
+        $run = $payload['run'] ?? null;
+        $evidence = $payload['evidence'] ?? null;
+
+        if (! is_array($origins)
+            || ! is_array($consumption)
+            || ! is_array($run)
+            || ! is_array($evidence)
+            || ! is_array($origins['native_trust_policy'] ?? null)
+            || ! is_array($origins['native_supervisor_attestation'] ?? null)
+            || ! is_array($consumption['authority_receipt'] ?? null)
+            || ! hash_equals(self::canonicalJson($origins['native_trust_policy']), self::canonicalJson($authority->trustPolicy->toArray()))
+            || ! hash_equals(self::canonicalJson($origins['native_supervisor_attestation']), self::canonicalJson($authority->supervisorAttestation->toArray()))
+            || ! hash_equals(self::canonicalJson($consumption['authority_receipt']), self::canonicalJson($authority->consumptionReceipt))
+            || ($evidence['contract'] ?? null) !== $authority->evidenceContract
+            || ($run['environment'] ?? null) !== $authority->probePlan->environment()
+            || ($run['launch_manifest_sha256'] ?? null) !== $authority->supervisorAttestation->launchManifestSha256) {
+            throw new InvalidArgumentException('The live payload does not match its verified native broker session.');
+        }
+
+        $receipts = $consumption['effect_execution_receipts'] ?? null;
+
+        if (! is_array($receipts) || ! array_is_list($receipts)) {
+            throw new InvalidArgumentException('The live payload has no canonical native effect receipt list.');
+        }
+
+        self::assertLiveEffectExecutionReceipts(
+            $receipts,
+            $session,
+            [
+                'origin' => 'real_provider',
+                'evidence_contract' => $authority->evidenceContract,
+                'environment' => (string) $run['environment'],
+                'launch_manifest_sha256' => (string) $run['launch_manifest_sha256'],
+                'claim_request_sha256' => $authority->claimRequestSha256,
+                'started_at' => (string) ($run['started_at'] ?? ''),
+                'finished_at' => (string) ($run['finished_at'] ?? ''),
+                'finished_monotonic_nanoseconds' => 1,
+            ],
+        );
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $documents
+     * @param  array{origin: 'real_provider', evidence_contract: string, environment: string, launch_manifest_sha256: string, claim_request_sha256: string, started_at: string, finished_at: string, finished_monotonic_nanoseconds: int}  $providerContext
+     */
+    private static function assertLiveEffectExecutionReceipts(
+        array $documents,
+        #[\SensitiveParameter] NativeBrokerSession $session,
+        array $providerContext,
+    ): void {
+        $authority = $session->authority;
+        $startedAt = self::strictUtcDate($providerContext['started_at']);
+        $finishedAt = self::strictUtcDate($providerContext['finished_at']);
+        $expectedBudgets = match ($authority->evidenceContract) {
+            SignedLiveProbeAuthorization::InvoiceIdentityEvidenceContract => [
+                'invoice.vat.issue' => 11,
+            ],
+            SignedLiveProbeAuthorization::KsefDemoEvidenceContract => [
+                'contract_probe.invoice.fixture.issue' => 8,
+                'invoice.ksef.ensure_accepted' => 2,
+            ],
+            default => throw new InvalidArgumentException('The native broker evidence contract has no effect receipt policy.'),
+        };
+        $sequences = [];
+        $effectIds = [];
+        $casRecords = [];
+
+        foreach ($documents as $document) {
+            $receipt = BrokeredEffectExecutionReceipt::fromArray($document);
+            $descriptor = $receipt->descriptor;
+            $session->authority->trustPolicy->assertEffectExecutionReceiptSignature($receipt);
+
+            foreach ([
+                $authority->evidenceContract => $descriptor->evidenceContract,
+                $authority->runId => $descriptor->runId,
+                $authority->runStartedAt => $descriptor->runStartedAt,
+                $authority->claimNonce => $descriptor->claimNonce,
+                $authority->authorizationSetSha256 => $descriptor->authorizationSetSha256,
+                $authority->authorizationBundleSha256 => $descriptor->authorizationBundleSha256,
+                $authority->probePlan->sha256() => $descriptor->probePlanSha256,
+                $authority->claimRequestSha256 => $descriptor->claimRequestSha256,
+                $authority->consumptionReceiptSha256 => $descriptor->consumptionReceiptSha256,
+                $authority->supervisorAttestation->launchManifestSha256 => $descriptor->launchManifestSha256,
+                $authority->supervisorAttestation->sha256() => $descriptor->supervisorAttestationSha256,
+                $authority->trustPolicy->brokerPolicySha256 => $descriptor->brokerPolicySha256,
+            ] as $expected => $actual) {
+                if (! hash_equals($expected, $actual)) {
+                    throw new InvalidArgumentException('A signed effect receipt belongs to a different native authority.');
+                }
+            }
+
+            $issuedAt = self::strictUtcDate($receipt->issuedAt);
+            $expiresAt = self::strictUtcDate($receipt->expiresAt);
+            $requestStartedAt = $receipt->requestStartedAt === null
+                ? null
+                : self::strictUtcDate($receipt->requestStartedAt);
+            $responseReceivedAt = $receipt->responseReceivedAt === null
+                ? null
+                : self::strictUtcDate($receipt->responseReceivedAt);
+
+            if (! in_array($descriptor->profile, $authority->profiles, true)
+                || ! isset($expectedBudgets[$descriptor->capability])
+                || ! in_array($receipt->disposition, [
+                    BrokeredEffectDisposition::Applied,
+                    BrokeredEffectDisposition::PossiblyApplied,
+                ], true)
+                || $requestStartedAt === null
+                || self::instantMicroseconds($requestStartedAt) < self::instantMicroseconds($startedAt)
+                || self::instantMicroseconds($issuedAt) > self::instantMicroseconds($finishedAt)
+                || self::instantMicroseconds($expiresAt) <= self::instantMicroseconds($finishedAt)
+                || ($responseReceivedAt !== null
+                    && self::instantMicroseconds($responseReceivedAt) > self::instantMicroseconds($finishedAt))) {
+                throw new InvalidArgumentException('A signed effect receipt is outside the exact provider run or effect policy.');
+            }
+
+            $sequenceKey = $descriptor->capability.':'.$descriptor->effectSequence;
+
+            if (isset($effectIds[$descriptor->effectId])
+                || isset($casRecords[$receipt->casRecordSha256])
+                || isset($sequences[$sequenceKey])) {
+                throw new InvalidArgumentException('Canonical live evidence contains a duplicate effect receipt.');
+            }
+
+            $effectIds[$descriptor->effectId] = true;
+            $casRecords[$receipt->casRecordSha256] = true;
+            $sequences[$sequenceKey] = true;
+        }
+
+        foreach ($expectedBudgets as $capability => $budget) {
+            foreach (range(1, $budget) as $sequence) {
+                if (! isset($sequences[$capability.':'.$sequence])) {
+                    throw new InvalidArgumentException('Canonical live evidence does not contain the exact effect receipt budget.');
+                }
+            }
+        }
+
+        if (count($documents) !== array_sum($expectedBudgets)
+            || count($sequences) !== count($documents)) {
+            throw new InvalidArgumentException('Canonical live evidence contains an unexpected effect receipt.');
+        }
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $documents
+     * @param  array<string, mixed>  $envelope
+     */
+    private static function assertHistoricalLiveEffectExecutionReceipts(
+        array $documents,
+        array $envelope,
+        #[\SensitiveParameter] NativeBrokerTrustPolicy $nativeBrokerTrustPolicy,
+        #[\SensitiveParameter] NativeSupervisorAttestation $nativeSupervisorAttestation,
+    ): void {
+        $consumption = $envelope['consumption'] ?? null;
+        $localClaim = is_array($consumption) ? ($consumption['local_claim'] ?? null) : null;
+        $authorityReceiptDocument = is_array($consumption) ? ($consumption['authority_receipt'] ?? null) : null;
+
+        if (! is_array($localClaim) || ! is_array($authorityReceiptDocument)) {
+            throw new InvalidArgumentException('Historical live receipts require exact authority evidence.');
+        }
+
+        $authorityReceipt = ConsumptionReceipt::fromArray($authorityReceiptDocument);
+        $claimRequest = $authorityReceipt->envelope->claimRequest;
+        $runStartedAt = self::strictUtcDate((string) ($envelope['run']['started_at'] ?? ''));
+        $runFinishedAt = self::strictUtcDate((string) ($envelope['run']['finished_at'] ?? ''));
+        $expectedBudgets = match ($envelope['evidence']['contract'] ?? null) {
+            SignedLiveProbeAuthorization::InvoiceIdentityEvidenceContract => [
+                'invoice.vat.issue' => 11,
+            ],
+            SignedLiveProbeAuthorization::KsefDemoEvidenceContract => [
+                'contract_probe.invoice.fixture.issue' => 8,
+                'invoice.ksef.ensure_accepted' => 2,
+            ],
+            default => throw new InvalidArgumentException('Historical live evidence has no receipt budget policy.'),
+        };
+        $authorizedProfiles = [];
+
+        foreach ($envelope['authorizations'] ?? [] as $reference) {
+            if (is_array($reference) && is_string($reference['profile'] ?? null)) {
+                $authorizedProfiles[] = $reference['profile'];
+            }
+        }
+
+        $sequences = [];
+        $effectIds = [];
+        $casRecords = [];
+
+        foreach ($documents as $document) {
+            $receipt = BrokeredEffectExecutionReceipt::fromArray($document);
+            $descriptor = $receipt->descriptor;
+            $nativeBrokerTrustPolicy->assertEffectExecutionReceiptSignature($receipt);
+
+            foreach ([
+                (string) $envelope['evidence']['contract'] => $descriptor->evidenceContract,
+                (string) ($localClaim['run_id'] ?? '') => $descriptor->runId,
+                $claimRequest->runStartedAt => $descriptor->runStartedAt,
+                $claimRequest->claimNonce => $descriptor->claimNonce,
+                (string) ($localClaim['authorization_set_sha256'] ?? '') => $descriptor->authorizationSetSha256,
+                $nativeSupervisorAttestation->authorizationBundleSha256 => $descriptor->authorizationBundleSha256,
+                $nativeSupervisorAttestation->probePlanSha256 => $descriptor->probePlanSha256,
+                $claimRequest->sha256() => $descriptor->claimRequestSha256,
+                self::signedDocumentSha256($authorityReceiptDocument) => $descriptor->consumptionReceiptSha256,
+                (string) $envelope['run']['launch_manifest_sha256'] => $descriptor->launchManifestSha256,
+                $nativeSupervisorAttestation->sha256() => $descriptor->supervisorAttestationSha256,
+                $nativeBrokerTrustPolicy->brokerPolicySha256 => $descriptor->brokerPolicySha256,
+            ] as $expected => $actual) {
+                if (! hash_equals($expected, $actual)) {
+                    throw new InvalidArgumentException('A historical effect receipt belongs to a different authority or run.');
+                }
+            }
+
+            $requestStartedAt = $receipt->requestStartedAt === null
+                ? null
+                : self::strictUtcDate($receipt->requestStartedAt);
+            $responseReceivedAt = $receipt->responseReceivedAt === null
+                ? null
+                : self::strictUtcDate($receipt->responseReceivedAt);
+            $issuedAt = self::strictUtcDate($receipt->issuedAt);
+            $expiresAt = self::strictUtcDate($receipt->expiresAt);
+
+            if (! in_array($descriptor->profile, $authorizedProfiles, true)
+                || ! isset($expectedBudgets[$descriptor->capability])
+                || ! in_array($receipt->disposition, [
+                    BrokeredEffectDisposition::Applied,
+                    BrokeredEffectDisposition::PossiblyApplied,
+                ], true)
+                || $requestStartedAt === null
+                || self::instantMicroseconds($requestStartedAt) < self::instantMicroseconds($runStartedAt)
+                || self::instantMicroseconds($issuedAt) > self::instantMicroseconds($runFinishedAt)
+                || self::instantMicroseconds($expiresAt) <= self::instantMicroseconds($runFinishedAt)
+                || ($responseReceivedAt !== null
+                    && self::instantMicroseconds($responseReceivedAt) > self::instantMicroseconds($runFinishedAt))) {
+                throw new InvalidArgumentException('A historical effect receipt is outside its exact provider run.');
+            }
+
+            $sequenceKey = $descriptor->capability.':'.$descriptor->effectSequence;
+
+            if (isset($effectIds[$descriptor->effectId])
+                || isset($casRecords[$receipt->casRecordSha256])
+                || isset($sequences[$sequenceKey])) {
+                throw new InvalidArgumentException('Historical live evidence repeats an effect receipt.');
+            }
+
+            $effectIds[$descriptor->effectId] = true;
+            $casRecords[$receipt->casRecordSha256] = true;
+            $sequences[$sequenceKey] = true;
+        }
+
+        foreach ($expectedBudgets as $capability => $budget) {
+            foreach (range(1, $budget) as $sequence) {
+                if (! isset($sequences[$capability.':'.$sequence])) {
+                    throw new InvalidArgumentException('Historical live evidence has an incomplete effect receipt budget.');
+                }
+            }
+        }
+
+        if (count($documents) !== array_sum($expectedBudgets)
+            || count($sequences) !== count($documents)) {
+            throw new InvalidArgumentException('Historical live evidence has an unexpected effect receipt budget.');
+        }
     }
 
     /** @param array<string, mixed> $envelope */
@@ -2976,6 +3622,7 @@ final class LiveEvidenceAttestationGuard
         array $envelope,
         string $expectedContract = self::EvidenceContract,
         bool $requireLiveOrigins = true,
+        #[\SensitiveParameter] ?NativeBrokerTrustPolicy $nativeBrokerTrustPolicy = null,
     ): void {
         $expectedKeys = [
             'contract',
@@ -3045,10 +3692,6 @@ final class LiveEvidenceAttestationGuard
             throw new InvalidArgumentException('The post-run evidence envelope has an invalid exact contract.');
         }
 
-        if ($requireLiveOrigins) {
-            self::assertLiveRuntimeOriginsShape($envelope['origins'], $envelope);
-        }
-
         self::harnessManifest($envelope['evidence']['contract']);
         self::assertArchivedHarnessSnapshotShape($envelope['probe']['archived_harness']);
         self::strictUtcDate($envelope['run']['started_at']);
@@ -3070,8 +3713,23 @@ final class LiveEvidenceAttestationGuard
         self::assertConsumptionAuthorityEnvelopeShape($consumption['authority_receipt']['envelope']);
 
         if ($requireLiveOrigins) {
-            throw new RuntimeException('The supervisor-signed brokered effect-execution verifier is not provisioned; canonical live evidence remains disabled.');
+            if (! $nativeBrokerTrustPolicy instanceof NativeBrokerTrustPolicy) {
+                throw new RuntimeException('Canonical live evidence requires a root-verified native broker trust policy.');
+            }
+
+            $nativeSupervisorAttestation = self::assertLiveRuntimeOriginsShape(
+                $envelope['origins'],
+                $envelope,
+                $nativeBrokerTrustPolicy,
+            );
+            self::assertHistoricalLiveEffectExecutionReceipts(
+                $consumption['effect_execution_receipts'],
+                $envelope,
+                $nativeBrokerTrustPolicy,
+                $nativeSupervisorAttestation,
+            );
         }
+
         $seenProfiles = [];
         $seenChallenges = [];
         $seenDocuments = [];
@@ -3104,8 +3762,11 @@ final class LiveEvidenceAttestationGuard
     }
 
     /** @param array<string, mixed> $envelope */
-    private static function assertLiveRuntimeOriginsShape(mixed $origins, array $envelope): void
-    {
+    private static function assertLiveRuntimeOriginsShape(
+        mixed $origins,
+        array $envelope,
+        #[\SensitiveParameter] NativeBrokerTrustPolicy $nativeBrokerTrustPolicy,
+    ): NativeSupervisorAttestation {
         if (! is_array($origins)
             || ! self::hasExactKeys($origins, [
                 'contract',
@@ -3115,15 +3776,28 @@ final class LiveEvidenceAttestationGuard
                 'claim_request_sha256',
                 'provider_run_sha256',
                 'launch_manifest_sha256',
+                'native_trust_policy_sha256',
+                'supervisor_attestation_sha256',
+                'native_trust_policy',
+                'native_supervisor_attestation',
             ])
             || ($origins['contract'] ?? null) !== self::LiveRuntimeOriginsContract
             || ($origins['version'] ?? null) !== self::Version
             || ($origins['scheme'] ?? null) !== self::LiveRuntimeOriginsScheme
+            || ! is_array($origins['native_trust_policy'] ?? null)
+            || ! is_array($origins['native_supervisor_attestation'] ?? null)
             || ! is_array($envelope['consumption']['authority_receipt'] ?? null)) {
             throw new InvalidArgumentException('The canonical live evidence runtime-origin commitment is invalid.');
         }
 
-        foreach (['authority_receipt_sha256', 'claim_request_sha256', 'provider_run_sha256', 'launch_manifest_sha256'] as $key) {
+        foreach ([
+            'authority_receipt_sha256',
+            'claim_request_sha256',
+            'provider_run_sha256',
+            'launch_manifest_sha256',
+            'native_trust_policy_sha256',
+            'supervisor_attestation_sha256',
+        ] as $key) {
             if (! is_string($origins[$key] ?? null)
                 || preg_match('/^[a-f0-9]{64}$/', $origins[$key]) !== 1) {
                 throw new InvalidArgumentException('The canonical live evidence runtime-origin hashes are invalid.');
@@ -3131,6 +3805,13 @@ final class LiveEvidenceAttestationGuard
         }
 
         $receipt = ConsumptionReceipt::fromArray($envelope['consumption']['authority_receipt']);
+        $attestation = NativeSupervisorAttestation::fromArray($origins['native_supervisor_attestation']);
+        $nativeBrokerTrustPolicy->assertSupervisorAttestationSignature($attestation);
+        $runStartedAt = self::strictUtcDate($envelope['run']['started_at']);
+        $runFinishedAt = self::strictUtcDate($envelope['run']['finished_at']);
+        $nativeBrokerTrustPolicy->assertValidAt($runFinishedAt);
+        $attestationIssuedAt = self::strictUtcDate($attestation->issuedAt);
+        $attestationExpiresAt = self::strictUtcDate($attestation->expiresAt);
         $expectedProviderRunSha256 = self::providerRunBindingSha256(
             $envelope['evidence']['contract'],
             $envelope['run']['started_at'],
@@ -3144,9 +3825,50 @@ final class LiveEvidenceAttestationGuard
             || ! hash_equals($origins['claim_request_sha256'], $receipt->envelope->claimRequest->sha256())
             || ! hash_equals($origins['provider_run_sha256'], $expectedProviderRunSha256)
             || ! hash_equals($origins['launch_manifest_sha256'], $envelope['run']['launch_manifest_sha256'])
-            || ! hash_equals($origins['launch_manifest_sha256'], $receipt->envelope->claimRequest->harness['launch_manifest_sha256'])) {
+            || ! hash_equals($origins['launch_manifest_sha256'], $receipt->envelope->claimRequest->harness['launch_manifest_sha256'])
+            || ! hash_equals($origins['native_trust_policy_sha256'], $nativeBrokerTrustPolicy->sha256())
+            || ! hash_equals(self::canonicalJson($origins['native_trust_policy']), self::canonicalJson($nativeBrokerTrustPolicy->toArray()))
+            || ! hash_equals($origins['supervisor_attestation_sha256'], $attestation->sha256())
+            || ! hash_equals($attestation->launchManifestSha256, $envelope['run']['launch_manifest_sha256'])
+            || ! hash_equals($attestation->authorizationSetSha256, $envelope['consumption']['local_claim']['authorization_set_sha256'])
+            || ! hash_equals($attestation->brokerPolicySha256, $nativeBrokerTrustPolicy->brokerPolicySha256)
+            || self::instantMicroseconds($attestationIssuedAt) > self::instantMicroseconds($runStartedAt)
+            || self::instantMicroseconds($attestationExpiresAt) <= self::instantMicroseconds($runFinishedAt)) {
             throw new InvalidArgumentException('The canonical live evidence runtime origins do not bind the exact receipt and provider run.');
         }
+
+        return $attestation;
+    }
+
+    /**
+     * @param  array<string, mixed>  $envelope
+     * @param  array<string, string>|null  $trustedNativeBrokerPolicies
+     */
+    private static function verifyHistoricalNativeBrokerTrustPolicy(
+        array $envelope,
+        #[\SensitiveParameter] ?array $trustedNativeBrokerPolicies,
+    ): NativeBrokerTrustPolicy {
+        if ($trustedNativeBrokerPolicies === null || $trustedNativeBrokerPolicies === []) {
+            throw new RuntimeException('Historical live evidence requires an externally pinned native policy root.');
+        }
+
+        self::assertTrustedSignerMap($trustedNativeBrokerPolicies);
+        $origins = $envelope['origins'] ?? null;
+        $document = is_array($origins) ? ($origins['native_trust_policy'] ?? null) : null;
+        $policyEnvelope = is_array($document) ? ($document['envelope'] ?? null) : null;
+        $signerId = is_array($policyEnvelope) ? ($policyEnvelope['signer_id'] ?? null) : null;
+        $publicKey = is_string($signerId) ? ($trustedNativeBrokerPolicies[$signerId] ?? null) : null;
+
+        if (! is_array($document) || ! is_string($signerId) || ! is_string($publicKey)) {
+            throw new InvalidArgumentException('The historical native policy is not signed by a pinned policy root.');
+        }
+
+        return NativeBrokerTrustPolicy::verify(
+            $document,
+            $signerId,
+            $publicKey,
+            self::strictUtcDate((string) ($envelope['run']['finished_at'] ?? '')),
+        );
     }
 
     /**
@@ -3485,14 +4207,18 @@ final class LiveEvidenceAttestationGuard
 
     /**
      * @param  array{origin: 'real_provider', evidence_contract: string, environment: string, launch_manifest_sha256: string, started_at: string, finished_at: string, finished_monotonic_nanoseconds: int}  $providerContext
-     * @return array<string, string>
+     * @return array<string, mixed>
      */
     private static function liveRuntimeOrigins(
         VerifiedFreshClaimGrant $authorityGrant,
         ConsumptionClaimRequest $claimRequest,
         array $providerContext,
         string $fixtureSha256,
+        #[\SensitiveParameter] NativeBrokerSession $session,
     ): array {
+        $policy = $session->authority->trustPolicy;
+        $attestation = $session->authority->supervisorAttestation;
+
         return [
             'contract' => self::LiveRuntimeOriginsContract,
             'version' => self::Version,
@@ -3500,6 +4226,8 @@ final class LiveEvidenceAttestationGuard
             'authority_receipt_sha256' => self::signedDocumentSha256($authorityGrant->toArray()),
             'claim_request_sha256' => $claimRequest->sha256(),
             'launch_manifest_sha256' => $providerContext['launch_manifest_sha256'],
+            'native_trust_policy_sha256' => $policy->sha256(),
+            'supervisor_attestation_sha256' => $attestation->sha256(),
             'provider_run_sha256' => self::providerRunBindingSha256(
                 $providerContext['evidence_contract'],
                 $providerContext['started_at'],
@@ -3508,6 +4236,8 @@ final class LiveEvidenceAttestationGuard
                 $providerContext['launch_manifest_sha256'],
                 $fixtureSha256,
             ),
+            'native_trust_policy' => $policy->toArray(),
+            'native_supervisor_attestation' => $attestation->toArray(),
         ];
     }
 
@@ -3520,8 +4250,9 @@ final class LiveEvidenceAttestationGuard
         array $signedAuthorizations,
         VerifiedFreshClaimGrant $authorityGrant,
         VerifiedLiveProviderRun $providerRun,
+        #[\SensitiveParameter] NativeBrokerSession $nativeBrokerSession,
     ): void {
-        self::assertEvidencePayloadShape($payload);
+        self::assertEvidencePayloadShape($payload, $nativeBrokerSession);
 
         if (($payload['contract'] ?? null) !== self::EvidencePayloadContract) {
             throw new InvalidArgumentException('Only a canonical dual-origin live payload may be published.');
@@ -3534,6 +4265,7 @@ final class LiveEvidenceAttestationGuard
             $claimRequest,
             $providerContext,
             $payload['evidence']['fixture_sha256'],
+            $nativeBrokerSession,
         );
 
         if (! hash_equals(self::canonicalJson($payload['origins']), self::canonicalJson($expectedOrigins))
@@ -3598,6 +4330,94 @@ final class LiveEvidenceAttestationGuard
             && ! str_contains($relativePath, '*')
             && ! str_contains($relativePath, '?')
             && str_ends_with($relativePath, '.json');
+    }
+
+    private static function writeExclusiveEvidenceArtifact(string $path, string $contents): void
+    {
+        $directory = dirname($path);
+
+        if (! is_dir($directory)
+            || is_link($directory)
+            || \file_exists($path)
+            || is_link($path)) {
+            throw new RuntimeException('Refusing to overwrite or publish into an unsafe evidence path.');
+        }
+
+        $temporaryPath = \tempnam($directory, '.live-evidence-');
+
+        if ($temporaryPath === false) {
+            throw new RuntimeException('A temporary live evidence artifact could not be created.');
+        }
+
+        $handle = null;
+        $linked = false;
+
+        try {
+            $metadata = lstat($temporaryPath);
+            $handle = fopen($temporaryPath, 'wb');
+
+            if ($metadata === false
+                || ($metadata['mode'] & 0170000) !== 0100000
+                || $metadata['nlink'] !== 1
+                || ! is_resource($handle)) {
+                throw new RuntimeException('The temporary live evidence artifact is unsafe.');
+            }
+
+            $written = 0;
+
+            while ($written < strlen($contents)) {
+                $bytes = fwrite($handle, substr($contents, $written));
+
+                if ($bytes === false || $bytes === 0) {
+                    throw new RuntimeException('The live evidence artifact could not be written completely.');
+                }
+
+                $written += $bytes;
+            }
+
+            if (! fflush($handle)
+                || function_exists('fsync') && ! fsync($handle)
+                || ! chmod($temporaryPath, 0644)) {
+                throw new RuntimeException('The live evidence artifact could not be flushed safely.');
+            }
+
+            fclose($handle);
+            $handle = null;
+
+            if (! \link($temporaryPath, $path)) {
+                throw new RuntimeException('The live evidence artifact could not be published atomically.');
+            }
+
+            $linked = true;
+
+            if (! unlink($temporaryPath)) {
+                throw new RuntimeException('The live evidence temporary hardlink could not be removed.');
+            }
+
+            $finalMetadata = lstat($path);
+
+            if ($finalMetadata === false
+                || ($finalMetadata['mode'] & 0170000) !== 0100000
+                || ($finalMetadata['mode'] & 0777) !== 0644
+                || $finalMetadata['nlink'] !== 1
+                || $finalMetadata['size'] !== strlen($contents)) {
+                throw new RuntimeException('The published live evidence artifact metadata is unsafe.');
+            }
+        } catch (\Throwable $exception) {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+
+            if (is_file($temporaryPath) && ! is_link($temporaryPath)) {
+                unlink($temporaryPath);
+            }
+
+            if ($linked && is_file($path) && ! is_link($path)) {
+                unlink($path);
+            }
+
+            throw $exception;
+        }
     }
 
     private static function readRepositoryFile(string $repositoryRoot, string $relativePath): string

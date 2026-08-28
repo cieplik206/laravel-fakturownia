@@ -17,10 +17,14 @@ final class NativeSupervisorAttestationVerifier
         string $launchManifestSha256,
         #[SensitiveParameter] string $runNonce,
         string $authorizationSetSha256,
+        string $authorizationBundleSha256,
+        string $probePlanSha256,
     ): NativeSupervisorAttestation {
         NativeBrokerWireValidation::assertSha256($launchManifestSha256, 'expected launch manifest');
         NativeBrokerWireValidation::assertCanonicalBase64Bytes($runNonce, 32, 'expected native supervisor run nonce');
         NativeBrokerWireValidation::assertSha256($authorizationSetSha256, 'expected authorization set');
+        NativeBrokerWireValidation::assertSha256($authorizationBundleSha256, 'expected authorization bundle');
+        NativeBrokerWireValidation::assertSha256($probePlanSha256, 'expected probe plan');
         $policy->assertValidAt($observedAt);
         $policy->assertSupervisorAttestationSignature($attestation);
         $issuedAt = NativeBrokerWireValidation::strictUtcMicrosecondInstant(
@@ -45,6 +49,8 @@ final class NativeSupervisorAttestationVerifier
         self::assertSame($launchManifestSha256, $attestation->launchManifestSha256, 'launch manifest');
         self::assertSame($runNonce, $attestation->runNonce, 'run nonce');
         self::assertSame($authorizationSetSha256, $attestation->authorizationSetSha256, 'authorization set');
+        self::assertSame($authorizationBundleSha256, $attestation->authorizationBundleSha256, 'authorization bundle');
+        self::assertSame($probePlanSha256, $attestation->probePlanSha256, 'probe plan');
         self::assertSame($policy->brokerPolicySha256, $attestation->brokerPolicySha256, 'broker policy');
         self::assertSame(
             $policy->supervisorSemanticsSha256,

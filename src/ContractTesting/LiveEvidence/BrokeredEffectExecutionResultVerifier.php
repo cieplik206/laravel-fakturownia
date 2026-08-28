@@ -36,6 +36,8 @@ final class BrokeredEffectExecutionResultVerifier
             $launchManifestSha256,
             $runNonce,
             $authorizationSetSha256,
+            $attestation->authorizationBundleSha256,
+            $attestation->probePlanSha256,
         );
         $policy->assertEffectExecutionResultSignature($result);
         $issuedAt = NativeBrokerWireValidation::strictUtcMicrosecondInstant(

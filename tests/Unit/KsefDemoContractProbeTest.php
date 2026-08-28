@@ -3365,7 +3365,7 @@ it('executes the mocked four-profile matrix with no manual auto-send', function 
     );
 
     expect(fn () => $probe->run())
-        ->toThrow(RuntimeException::class, 'cannot publish canonical live KSeF evidence')
+        ->toThrow(RuntimeException::class, 'brokered_effect_execution_unavailable')
         ->and($transport->requestCount(AccountKsefDemoRequest::class))->toBe(0)
         ->and(is_dir($fixtureDirectory))->toBeFalse();
 

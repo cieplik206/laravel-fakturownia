@@ -153,6 +153,84 @@ final readonly class NativeBrokerTrustPolicy implements JsonSerializable
         );
     }
 
+    public function assertEffectExecutionReceiptSignature(
+        #[SensitiveParameter] BrokeredEffectExecutionReceipt $receipt,
+    ): void {
+        if (! \hash_equals($this->effectResultSignerId, $receipt->signerId)) {
+            throw new InvalidArgumentException('The brokered effect receipt signer is not trusted for this role.');
+        }
+
+        self::assertDetachedSignature(
+            $receipt->signature,
+            $receipt->canonicalEnvelope(),
+            $this->effectResultPublicKey,
+            'brokered effect execution receipt',
+        );
+    }
+
+    public function assertReadObservationResultSignature(
+        #[SensitiveParameter] BrokeredReadObservationResult $result,
+    ): void {
+        if (! \hash_equals($this->effectResultSignerId, $result->signerId)) {
+            throw new InvalidArgumentException('The brokered read result signer is not trusted for this role.');
+        }
+
+        self::assertDetachedSignature(
+            $result->signature,
+            $result->canonicalEnvelope(),
+            $this->effectResultPublicKey,
+            'brokered read observation result',
+        );
+    }
+
+    /** @return array<string, int|string|array<string, string>> */
+    public function envelope(): array
+    {
+        return [
+            'contract' => self::Contract,
+            'version' => self::Version,
+            'algorithm' => self::Algorithm,
+            'signer_id' => $this->signerId,
+            'issued_at' => $this->issuedAt,
+            'expires_at' => $this->expiresAt,
+            'broker_policy_sha256' => $this->brokerPolicySha256,
+            'supervisor_semantics_sha256' => $this->supervisorSemanticsSha256,
+            'argv_sha256' => $this->argvSha256,
+            'environment_sha256' => $this->environmentSha256,
+            'probe_uid' => $this->probeUid,
+            'probe_gid' => $this->probeGid,
+            'supervisor_signer' => [
+                'id' => $this->supervisorSignerId,
+                'algorithm' => self::Algorithm,
+                'public_key' => $this->supervisorPublicKey,
+            ],
+            'effect_result_signer' => [
+                'id' => $this->effectResultSignerId,
+                'algorithm' => self::Algorithm,
+                'public_key' => $this->effectResultPublicKey,
+            ],
+        ];
+    }
+
+    /** @return array{envelope: array<string, mixed>, signature: string} */
+    public function toArray(): array
+    {
+        return [
+            'envelope' => $this->envelope(),
+            'signature' => $this->signature,
+        ];
+    }
+
+    public function canonical(): string
+    {
+        return CanonicalCodec::encode($this->toArray());
+    }
+
+    public function sha256(): string
+    {
+        return \hash('sha256', $this->canonical());
+    }
+
     /** @return array{native_broker_trust_policy: string, public_keys: string} */
     public function __debugInfo(): array
     {
