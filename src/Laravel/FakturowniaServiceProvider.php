@@ -13,9 +13,13 @@ use Cieplik206\Fakturownia\Laravel\Artifacts\DatabaseArtifactStore;
 use Cieplik206\Fakturownia\Laravel\Artifacts\DispatchInvoicePdfReady;
 use Cieplik206\Fakturownia\Laravel\Artifacts\FakturowniaInvoicePdfSourceReader;
 use Cieplik206\Fakturownia\Laravel\Artifacts\FilesystemContentAddressedArtifactStore;
+use Cieplik206\Fakturownia\Laravel\Attachments\DatabaseAttachmentWorkflowStore;
+use Cieplik206\Fakturownia\Laravel\Attachments\DispatchAttachmentFinalize;
+use Cieplik206\Fakturownia\Laravel\Attachments\DispatchInvoiceAttachmentReady;
 use Cieplik206\Fakturownia\Laravel\Console\DoctorFakturowniaCommand;
 use Cieplik206\Fakturownia\Laravel\Console\InstallFakturowniaCommand;
 use Cieplik206\Fakturownia\Laravel\Console\MaintainFakturowniaArtifactsCommand;
+use Cieplik206\Fakturownia\Laravel\Console\RecoverFakturowniaAttachmentsCommand;
 use Cieplik206\Fakturownia\Laravel\Contracts\ConfigurationPublisher;
 use Cieplik206\Fakturownia\Laravel\Ksef\DatabaseKsefStateProjectionStore;
 use Cieplik206\Fakturownia\Laravel\Ksef\DispatchInvoiceKsefAccepted;
@@ -44,6 +48,40 @@ use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\InvoicePdfOutcomeProjec
 use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\InvoicePdfOutcomeProjector;
 use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\InvoicePdfReadyResultCodec;
 use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\InvoicePdfStager;
+use Cieplik206\Fakturownia\Stateful\Attachments\AttachmentSourceStager;
+use Cieplik206\Fakturownia\Stateful\Attachments\Finalize\AuthoritativeFinalizeAttachmentOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Attachments\Finalize\AuthoritativeFinalizeAttachmentReconciliationStrategy;
+use Cieplik206\Fakturownia\Stateful\Attachments\Finalize\Contracts\AttachmentPresenceReader;
+use Cieplik206\Fakturownia\Stateful\Attachments\Finalize\Contracts\FinalizeAttachmentTransport;
+use Cieplik206\Fakturownia\Stateful\Attachments\Finalize\DisabledFinalizeAttachmentTransport;
+use Cieplik206\Fakturownia\Stateful\Attachments\Finalize\FakturowniaAttachmentPresenceReader;
+use Cieplik206\Fakturownia\Stateful\Attachments\Finalize\FinalizeAttachmentOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Attachments\Finalize\FinalizeAttachmentOperationFactory;
+use Cieplik206\Fakturownia\Stateful\Attachments\Finalize\FinalizeAttachmentOperationHandler;
+use Cieplik206\Fakturownia\Stateful\Attachments\Finalize\FinalizeAttachmentOutcomeProjectionPlanner;
+use Cieplik206\Fakturownia\Stateful\Attachments\Finalize\FinalizeAttachmentOutcomeProjector;
+use Cieplik206\Fakturownia\Stateful\Attachments\Finalize\FinalizeAttachmentPayloadCodec;
+use Cieplik206\Fakturownia\Stateful\Attachments\Finalize\FinalizeAttachmentReconciliationStrategy;
+use Cieplik206\Fakturownia\Stateful\Attachments\Finalize\FinalizeAttachmentResultCodec;
+use Cieplik206\Fakturownia\Stateful\Attachments\Operations\AttachmentFailureClassifier;
+use Cieplik206\Fakturownia\Stateful\Attachments\Operations\AttachmentRetryPolicy;
+use Cieplik206\Fakturownia\Stateful\Attachments\Operations\AuthoritativeAttachmentFailureClassifier;
+use Cieplik206\Fakturownia\Stateful\Attachments\Operations\AuthoritativeAttachmentRetryPolicy;
+use Cieplik206\Fakturownia\Stateful\Attachments\Operations\Contracts\UploadAttachmentBinaryTransport;
+use Cieplik206\Fakturownia\Stateful\Attachments\Upload\AttachmentBinaryUploadedResultCodec;
+use Cieplik206\Fakturownia\Stateful\Attachments\Upload\AuthoritativeUploadAttachmentBinaryOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Attachments\Upload\AuthoritativeUploadAttachmentBinaryReconciliationStrategy;
+use Cieplik206\Fakturownia\Stateful\Attachments\Upload\DisabledUploadAttachmentBinaryTransport;
+use Cieplik206\Fakturownia\Stateful\Attachments\Upload\UploadAttachmentBinaryOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Attachments\Upload\UploadAttachmentBinaryOperationFactory;
+use Cieplik206\Fakturownia\Stateful\Attachments\Upload\UploadAttachmentBinaryOperationHandler;
+use Cieplik206\Fakturownia\Stateful\Attachments\Upload\UploadAttachmentBinaryOutcomeProjectionPlanner;
+use Cieplik206\Fakturownia\Stateful\Attachments\Upload\UploadAttachmentBinaryOutcomeProjector;
+use Cieplik206\Fakturownia\Stateful\Attachments\Upload\UploadAttachmentBinaryPayloadCodec;
+use Cieplik206\Fakturownia\Stateful\Attachments\Upload\UploadAttachmentBinaryReconciliationStrategy;
+use Cieplik206\Fakturownia\Stateful\Attachments\Workflow\AdvanceAttachmentWorkflow;
+use Cieplik206\Fakturownia\Stateful\Attachments\Workflow\AttachmentWorkflowCoordinator;
+use Cieplik206\Fakturownia\Stateful\Attachments\Workflow\Contracts\AttachmentWorkflowStore;
 use Cieplik206\Fakturownia\Stateful\Contracts\ConnectionResolver;
 use Cieplik206\Fakturownia\Stateful\Corrections\CorrectionResourceProjectionMapper;
 use Cieplik206\Fakturownia\Stateful\Corrections\Operations\AuthoritativeIssueCorrectionFailureClassifier;
@@ -247,6 +285,43 @@ final class FakturowniaServiceProvider extends ServiceProvider
         $this->app->singleton(DisabledDeleteCostInvoiceTransport::class);
         $this->app->alias(DisabledDeleteCostInvoiceTransport::class, DeleteCostInvoiceTransport::class);
 
+        $this->app->singleton(AttachmentSourceStager::class);
+        $this->app->singleton(UploadAttachmentBinaryPayloadCodec::class);
+        $this->app->singleton(UploadAttachmentBinaryOperationFactory::class);
+        $this->app->singleton(UploadAttachmentBinaryOperationHandler::class);
+        $this->app->singleton(AttachmentFailureClassifier::class);
+        $this->app->singleton(AuthoritativeAttachmentFailureClassifier::class);
+        $this->app->singleton(AttachmentRetryPolicy::class);
+        $this->app->singleton(AuthoritativeAttachmentRetryPolicy::class);
+        $this->app->singleton(UploadAttachmentBinaryReconciliationStrategy::class);
+        $this->app->singleton(AuthoritativeUploadAttachmentBinaryReconciliationStrategy::class);
+        $this->app->singleton(AttachmentBinaryUploadedResultCodec::class);
+        $this->app->singleton(UploadAttachmentBinaryOutcomeProjector::class);
+        $this->app->singleton(UploadAttachmentBinaryOutcomeProjectionPlanner::class);
+        $this->app->singleton(DisabledUploadAttachmentBinaryTransport::class);
+        $this->app->alias(
+            DisabledUploadAttachmentBinaryTransport::class,
+            UploadAttachmentBinaryTransport::class,
+        );
+        $this->app->singleton(AttachmentWorkflowCoordinator::class);
+        $this->app->singleton(AdvanceAttachmentWorkflow::class);
+        $this->app->singleton(DatabaseAttachmentWorkflowStore::class);
+        $this->app->alias(DatabaseAttachmentWorkflowStore::class, AttachmentWorkflowStore::class);
+        $this->app->singleton(FinalizeAttachmentPayloadCodec::class);
+        $this->app->singleton(FinalizeAttachmentOperationFactory::class);
+        $this->app->singleton(FinalizeAttachmentOperationHandler::class);
+        $this->app->singleton(FinalizeAttachmentReconciliationStrategy::class);
+        $this->app->singleton(AuthoritativeFinalizeAttachmentReconciliationStrategy::class);
+        $this->app->singleton(FinalizeAttachmentResultCodec::class);
+        $this->app->singleton(FinalizeAttachmentOutcomeProjector::class);
+        $this->app->singleton(FinalizeAttachmentOutcomeProjectionPlanner::class);
+        $this->app->singleton(FakturowniaAttachmentPresenceReader::class);
+        $this->app->alias(FakturowniaAttachmentPresenceReader::class, AttachmentPresenceReader::class);
+        $this->app->singleton(DisabledFinalizeAttachmentTransport::class);
+        $this->app->alias(DisabledFinalizeAttachmentTransport::class, FinalizeAttachmentTransport::class);
+        $this->app->singleton(DispatchAttachmentFinalize::class);
+        $this->app->singleton(DispatchInvoiceAttachmentReady::class);
+
         $this->app->singleton(IssueProformaPayloadCodec::class);
         $this->app->singleton(IssueProformaOperationFactory::class);
         $this->app->singleton(IssueProformaOperationHandler::class);
@@ -361,6 +436,14 @@ final class FakturowniaServiceProvider extends ServiceProvider
         $operations->registerAuthoritativeProvider(
             AuthoritativeDeleteCostInvoiceOperationDefinitionProvider::class,
         );
+        $operations->registerProvider(UploadAttachmentBinaryOperationDefinitionProvider::class);
+        $operations->registerAuthoritativeProvider(
+            AuthoritativeUploadAttachmentBinaryOperationDefinitionProvider::class,
+        );
+        $operations->registerProvider(FinalizeAttachmentOperationDefinitionProvider::class);
+        $operations->registerAuthoritativeProvider(
+            AuthoritativeFinalizeAttachmentOperationDefinitionProvider::class,
+        );
         $operations->registerProvider(IssueProformaOperationDefinitionProvider::class);
         $operations->registerAuthoritativeProvider(AuthoritativeIssueProformaOperationDefinitionProvider::class);
         $operations->registerProvider(IssueCorrectionOperationDefinitionProvider::class);
@@ -378,6 +461,14 @@ final class FakturowniaServiceProvider extends ServiceProvider
             OperationTerminalized::class,
             [DispatchInvoicePdfReady::class, 'handle'],
         );
+        $this->app->make(Dispatcher::class)->listen(
+            OperationTerminalized::class,
+            [DispatchAttachmentFinalize::class, 'handle'],
+        );
+        $this->app->make(Dispatcher::class)->listen(
+            OperationTerminalized::class,
+            [DispatchInvoiceAttachmentReady::class, 'handle'],
+        );
 
         $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
 
@@ -390,6 +481,7 @@ final class FakturowniaServiceProvider extends ServiceProvider
                 DoctorFakturowniaCommand::class,
                 InstallFakturowniaCommand::class,
                 MaintainFakturowniaArtifactsCommand::class,
+                RecoverFakturowniaAttachmentsCommand::class,
             ]);
         }
     }

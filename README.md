@@ -199,6 +199,33 @@ The wrapper delegates to the kernel's shared `OperationQuery` and always adds
 the exact `fakturownia` provider plus selected connection scope. It is not a
 second state store and cannot read another connection's operations.
 
+## Stateful invoice attachments
+
+Invoice attachment writes are a two-operation workflow. The
+`AttachmentWorkflowCoordinator` first stages a bounded PDF in the configured
+content-addressed artifact store and accepts
+`fakturownia.invoice.attachment.binary.upload`. A terminal upload projects a
+provider-owned dependency record and accepts the distinct
+`fakturownia.invoice.attachment.finalize` child. The attachment becomes ready,
+and `InvoiceAttachmentReady` is dispatched, only after the finalize operation
+has terminally succeeded.
+
+The two steps have independent receipts, effect boundaries, retry policies,
+and read-only reconciliation. Both remote transports are disabled by default;
+a consumer must bind reviewed upload and finalize adapters separately. The
+upload adapter must not send the Fakturownia API token to the temporary object
+host. The finalize adapter owns the single API mutation that attaches the
+uploaded file to the invoice.
+
+If a worker stops after upload projection but before accepting the finalize
+child, run the bounded idempotent recovery command:
+
+    php artisan fakturownia:attachments:recover --limit=50
+
+The command reads only workflows without a finalize link and reuses the
+kernel's idempotent acceptance key. It does not upload bytes or call the
+provider directly.
+
 ## Stateful KSeF acceptance
 
 KSeF acceptance is an explicit operation separate from invoice issue. Build an

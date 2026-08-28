@@ -14,6 +14,14 @@ Versioning.
 
 ### Added
 
+- Add a durable two-stage invoice attachment workflow: content-addressed
+  staging and binary upload are isolated from the provider finalize request,
+  with separate effect boundaries, reconciliation, receipts, and fail-closed
+  default transports.
+- Persist upload-to-finalize dependency links, recover missing finalize child
+  operations with `fakturownia:attachments:recover`, and dispatch
+  `InvoiceAttachmentReady` only after the finalize operation reaches a
+  terminal success.
 - Expose the provider client `shortcut` as a typed nullable field on
   `ClientResponseData` instead of leaving it in the extension payload.
 - Add the explicit `fakturownia.invoice.ksef.ensure_accepted` operation with

@@ -64,6 +64,7 @@ it('owns the exact package migrations without ConnectionKey duplication or boot 
             packageRoot().'/database/migrations/2026_08_26_000004_create_fakturownia_sync_checkpoints_table.php',
             packageRoot().'/database/migrations/2026_08_26_000005_create_fakturownia_invoice_ksef_states_table.php',
             packageRoot().'/database/migrations/2026_08_27_000006_allow_correction_invoice_resource_references.php',
+            packageRoot().'/database/migrations/2026_08_28_000007_create_fakturownia_attachment_workflows_table.php',
         ])
         ->and(hash_file('sha256', packageRoot().'/database/migrations/2026_08_26_000001_create_fakturownia_artifacts_table.php'))
         ->toBe('b757e6005b4c30bb1e53c5bb6130bdd280cc4367b0d9f07c64b89ff56a9f12ad')
@@ -77,6 +78,8 @@ it('owns the exact package migrations without ConnectionKey duplication or boot 
         ->toBe('b2527ec9ed2187c91e29c93ed4654f7750a7ef8afb8d00f2a8820e24199ecc77')
         ->and(hash_file('sha256', packageRoot().'/database/migrations/2026_08_27_000006_allow_correction_invoice_resource_references.php'))
         ->toBe('52a2b92850cde8cc0a970d1ae701a157581c28b65e8996b17edf039a1179c735')
+        ->and(hash_file('sha256', packageRoot().'/database/migrations/2026_08_28_000007_create_fakturownia_attachment_workflows_table.php'))
+        ->toBe('53bb9146d5c0c0b2cd8946c75d8e5f66b37ff662aa03eea04a63a966a5f0a2fe')
         ->and($provider)->not->toBeFalse()
         ->and($provider)->toContain("\$this->loadMigrationsFrom(__DIR__.'/../../database/migrations');")
         ->and($provider)->not->toContain('Http::')
@@ -125,6 +128,8 @@ it('keeps the complete public and Saloon dispatch surface closed behind the RT-3
             'capability_contract:cost.invoice.create' => 22,
             'capability_contract:cost.invoice.delete' => 35,
             'capability_contract:cost.invoice.status.change' => 26,
+            'capability_contract:invoice.attachment.binary.upload' => 32,
+            'capability_contract:invoice.attachment.finalize' => 69,
             'capability_contract:invoice.correction.issue' => 64,
             'capability_contract:invoice.ksef.ensure_accepted' => 112,
             'capability_contract:invoice.pdf.download' => 253,
@@ -140,7 +145,7 @@ it('keeps the complete public and Saloon dispatch surface closed behind the RT-3
             'testing_no_io' => 48,
         ])
         ->and(hash_file('sha256', publicMethodInventoryPath()))
-        ->toBe('2a443746a16dced513eddde08e8135a55d8aa2f710c6dcae588b2b7d9cb0f31b');
+        ->toBe('0f9390b9c6c4756bd537269d9b77a2b65f3eeba6359103443d533fb4cd69ba88');
 
     $statuses = capabilityStatuses($matrix);
 
@@ -298,6 +303,8 @@ function publicMethodInventoryErrors(array $inventory): array
         'capability_contract:cost.invoice.create',
         'capability_contract:cost.invoice.delete',
         'capability_contract:cost.invoice.status.change',
+        'capability_contract:invoice.attachment.binary.upload',
+        'capability_contract:invoice.attachment.finalize',
         'capability_contract:invoice.correction.issue',
         'capability_contract:invoice.ksef.ensure_accepted',
         'capability_contract:invoice.pdf.download',

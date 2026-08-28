@@ -1320,6 +1320,8 @@ it('requires the exact normative fields for every capability', function (): void
             'exact_business_oid_with_stable_payload_fingerprint; absent_conclusive_terminates_failed_not_applied',
             'exact_cost_resource_and_expected_or_target_open_status_comparison',
             'exact_original_invoice_link_business_oid_and_correction_fingerprint',
+            'durable_source_verification_then_remote_upload_evidence_or_manual_review',
+            'exact_attachment_file_name_and_prior_count_comparison',
         ],
         'poll_only_after_effect_boundary' => ['preflight_then_one_explicit_send_then_status_observation_until_terminal_or_manual_review'],
         'disabled_until_capability_gate' => ['not_frozen'],

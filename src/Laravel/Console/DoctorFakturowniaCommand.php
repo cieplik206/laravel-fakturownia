@@ -7,6 +7,8 @@ namespace Cieplik206\Fakturownia\Laravel\Console;
 use Cieplik206\Fakturownia\Laravel\Artifacts\PostgresArtifactMaintenanceManagerFactory;
 use Cieplik206\Fakturownia\Stateful\Artifacts\Maintenance\Contracts\ArtifactMaintenanceStoreFactory;
 use Cieplik206\Fakturownia\Stateful\Artifacts\Operations\DownloadInvoicePdfOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Attachments\Finalize\FinalizeAttachmentOperationFactory;
+use Cieplik206\Fakturownia\Stateful\Attachments\Upload\UploadAttachmentBinaryOperationFactory;
 use Cieplik206\Fakturownia\Stateful\Contracts\ConnectionResolver;
 use Cieplik206\Fakturownia\Stateful\Corrections\Operations\IssueCorrectionOperationDefinitionProvider;
 use Cieplik206\Fakturownia\Stateful\Costs\Delete\DeleteCostInvoiceOperationFactory;
@@ -101,6 +103,8 @@ final class DoctorFakturowniaCommand extends Command
             IssueCostInvoiceOperationFactory::OperationType,
             ChangeCostInvoiceStatusOperationFactory::OperationType,
             DeleteCostInvoiceOperationFactory::OperationType,
+            UploadAttachmentBinaryOperationFactory::OperationType,
+            FinalizeAttachmentOperationFactory::OperationType,
         ];
         $operationTypes = [
             FakturowniaDiagnosticDefinitionProvider::OperationType,

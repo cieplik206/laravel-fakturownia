@@ -4,12 +4,25 @@ declare(strict_types=1);
 
 use Cieplik206\Fakturownia\Client\Contracts\ClientFactory;
 use Cieplik206\Fakturownia\Laravel\Artifacts\PostgresArtifactMaintenanceManagerFactory;
+use Cieplik206\Fakturownia\Laravel\Attachments\DatabaseAttachmentWorkflowStore;
 use Cieplik206\Fakturownia\Laravel\ConfigConnectionResolver;
 use Cieplik206\Fakturownia\Laravel\Contracts\ConfigurationPublisher;
 use Cieplik206\Fakturownia\Stateful\Artifacts\Maintenance\ArtifactMaintenanceReport;
 use Cieplik206\Fakturownia\Stateful\Artifacts\Maintenance\ArtifactPurgePermitVerifier;
 use Cieplik206\Fakturownia\Stateful\Artifacts\Maintenance\Contracts\ArtifactMaintenanceStore;
 use Cieplik206\Fakturownia\Stateful\Artifacts\Maintenance\Contracts\ArtifactMaintenanceStoreFactory;
+use Cieplik206\Fakturownia\Stateful\Attachments\Finalize\AuthoritativeFinalizeAttachmentOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Attachments\Finalize\Contracts\FinalizeAttachmentTransport;
+use Cieplik206\Fakturownia\Stateful\Attachments\Finalize\DisabledFinalizeAttachmentTransport;
+use Cieplik206\Fakturownia\Stateful\Attachments\Finalize\FinalizeAttachmentOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Attachments\Finalize\FinalizeAttachmentOperationFactory;
+use Cieplik206\Fakturownia\Stateful\Attachments\Operations\Contracts\UploadAttachmentBinaryTransport;
+use Cieplik206\Fakturownia\Stateful\Attachments\Upload\AuthoritativeUploadAttachmentBinaryOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Attachments\Upload\DisabledUploadAttachmentBinaryTransport;
+use Cieplik206\Fakturownia\Stateful\Attachments\Upload\UploadAttachmentBinaryOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Attachments\Upload\UploadAttachmentBinaryOperationFactory;
+use Cieplik206\Fakturownia\Stateful\Attachments\Workflow\AttachmentWorkflowCoordinator;
+use Cieplik206\Fakturownia\Stateful\Attachments\Workflow\Contracts\AttachmentWorkflowStore;
 use Cieplik206\Fakturownia\Stateful\Contracts\ConnectionResolver;
 use Cieplik206\Fakturownia\Stateful\Costs\Delete\AuthoritativeDeleteCostInvoiceOperationDefinitionProvider;
 use Cieplik206\Fakturownia\Stateful\Costs\Delete\Contracts\DeleteCostInvoiceTransport;
@@ -116,6 +129,40 @@ it('registers isolated cost mutation runtimes with fail-closed transports', func
         ->toBeInstanceOf(DisabledDeleteCostInvoiceTransport::class);
 });
 
+it('registers the two-stage attachment workflow with independent fail-closed transports', function (): void {
+    $definitions = $this->app->make(DefinitionRegistry::class);
+    $authoritativeDefinitions = $this->app->make(AuthoritativeDefinitionRegistry::class);
+    $operations = [
+        [
+            UploadAttachmentBinaryOperationDefinitionProvider::provider(),
+            AuthoritativeUploadAttachmentBinaryOperationDefinitionProvider::provider(),
+            UploadAttachmentBinaryOperationFactory::OperationType,
+        ],
+        [
+            FinalizeAttachmentOperationDefinitionProvider::provider(),
+            AuthoritativeFinalizeAttachmentOperationDefinitionProvider::provider(),
+            FinalizeAttachmentOperationFactory::OperationType,
+        ],
+    ];
+
+    foreach ($operations as [$provider, $authoritativeProvider, $operationType]) {
+        expect($definitions->find($provider, new OperationType($operationType), 1))->not->toBeNull()
+            ->and($authoritativeDefinitions->find(
+                $authoritativeProvider,
+                new OperationType($operationType),
+                1,
+            ))->not->toBeNull();
+    }
+
+    expect($this->app->make(UploadAttachmentBinaryTransport::class))
+        ->toBeInstanceOf(DisabledUploadAttachmentBinaryTransport::class)
+        ->and($this->app->make(FinalizeAttachmentTransport::class))
+        ->toBeInstanceOf(DisabledFinalizeAttachmentTransport::class)
+        ->and($this->app->make(AttachmentWorkflowStore::class))
+        ->toBeInstanceOf(DatabaseAttachmentWorkflowStore::class)
+        ->and($this->app->bound(AttachmentWorkflowCoordinator::class))->toBeTrue();
+});
+
 it('injects the shared scoped operation query into resolved connections', function (): void {
     config()->set('fakturownia.connections.testing', [
         'deployment_stage' => 'non_production',
@@ -184,7 +231,7 @@ it('registers fail-closed provider and artifact maintenance diagnostics without 
     $maintenanceOutput = Artisan::output();
 
     expect($doctorExitCode)->toBe(1)
-        ->and($doctorOutput)->toContain('9 provider operation definitions and 8 authoritative definitions are frozen')
+        ->and($doctorOutput)->toContain('11 provider operation definitions and 10 authoritative definitions are frozen')
         ->and($doctorOutput)->toContain('capability-aware artifact maintenance store is not bound')
         ->and($doctorOutput)->not->toContain('doctor-secret-token')
         ->and($maintenanceExitCode)->toBe(2)
