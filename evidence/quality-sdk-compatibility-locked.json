@@ -1,0 +1,11 @@
+{
+    "status": "passed",
+    "gate_id": "sdk-compatibility-locked",
+    "repository": "sdk",
+    "command": "composer test:compatibility:locked",
+    "environment": "compatibility-locked",
+    "script_definition_sha256": "40d8f796b96c07a6f56b4a88c9c2c1eb34a1e0c177787c00447c43fc18b723f3",
+    "exit_code": 0,
+    "skipped_tests": 0,
+    "tested_tree_sha256": "d02a4cbf7f6867303df3eda27506df43c5109fe5b1b0413641e388dc9dc810cf"
+}
