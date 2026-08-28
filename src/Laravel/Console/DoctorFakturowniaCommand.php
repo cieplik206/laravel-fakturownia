@@ -12,6 +12,8 @@ use Cieplik206\Fakturownia\Stateful\Corrections\Operations\IssueCorrectionOperat
 use Cieplik206\Fakturownia\Stateful\Diagnostics\FakturowniaDiagnosticDefinitionProvider;
 use Cieplik206\Fakturownia\Stateful\Invoices\Operations\IssueInvoiceOperationDefinitionProvider;
 use Cieplik206\Fakturownia\Stateful\Ksef\Operations\EnsureAcceptedOperationDefinitionProvider;
+use Cieplik206\Fakturownia\Stateful\Proformas\Operations\IssueProformaOperationFactory;
+use Cieplik206\IntegrationOperations\Registry\AuthoritativeDefinitionRegistry;
 use Cieplik206\IntegrationOperations\Registry\DefinitionRegistry;
 use Cieplik206\IntegrationOperations\ValueObjects\ConnectionKey;
 use Cieplik206\IntegrationOperations\ValueObjects\OperationType;
@@ -32,6 +34,7 @@ final class DoctorFakturowniaCommand extends Command
         private readonly Container $container,
         private readonly ConnectionResolver $connections,
         private readonly DefinitionRegistry $definitions,
+        private readonly AuthoritativeDefinitionRegistry $authoritativeDefinitions,
     ) {
         parent::__construct();
     }
@@ -86,12 +89,16 @@ final class DoctorFakturowniaCommand extends Command
     /** @return array{string, string, string} */
     private function definitionCheck(): array
     {
-        $operationTypes = [
-            FakturowniaDiagnosticDefinitionProvider::OperationType,
+        $authoritativeOperationTypes = [
             IssueInvoiceOperationDefinitionProvider::OperationType,
+            IssueProformaOperationFactory::OperationType,
             IssueCorrectionOperationDefinitionProvider::OperationType,
             EnsureAcceptedOperationDefinitionProvider::OperationType,
             DownloadInvoicePdfOperationDefinitionProvider::OperationType,
+        ];
+        $operationTypes = [
+            FakturowniaDiagnosticDefinitionProvider::OperationType,
+            ...$authoritativeOperationTypes,
         ];
         $provider = FakturowniaDiagnosticDefinitionProvider::provider();
 
@@ -101,7 +108,21 @@ final class DoctorFakturowniaCommand extends Command
             }
         }
 
-        return ['definitions', 'ok', sprintf('%d provider operation definitions are frozen.', count($operationTypes))];
+        foreach ($authoritativeOperationTypes as $operationType) {
+            if ($this->authoritativeDefinitions->find($provider, new OperationType($operationType), 1) === null) {
+                return ['definitions', 'failed', 'A required authoritative provider operation definition is unavailable.'];
+            }
+        }
+
+        return [
+            'definitions',
+            'ok',
+            sprintf(
+                '%d provider operation definitions and %d authoritative definitions are frozen.',
+                count($operationTypes),
+                count($authoritativeOperationTypes),
+            ),
+        ];
     }
 
     /** @return array{string, string, string} */

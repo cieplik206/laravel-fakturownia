@@ -7,6 +7,11 @@ Versioning.
 
 ## [Unreleased]
 
+### Fixed
+
+- Make `fakturownia:doctor` verify the registered proforma operation and every
+  authoritative provider definition before reporting the registry as healthy.
+
 ### Added
 
 - Expose the provider client `shortcut` as a typed nullable field on

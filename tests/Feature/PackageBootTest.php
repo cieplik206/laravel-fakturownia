@@ -131,6 +131,7 @@ it('registers fail-closed provider and artifact maintenance diagnostics without 
     $maintenanceOutput = Artisan::output();
 
     expect($doctorExitCode)->toBe(1)
+        ->and($doctorOutput)->toContain('6 provider operation definitions and 5 authoritative definitions are frozen')
         ->and($doctorOutput)->toContain('capability-aware artifact maintenance store is not bound')
         ->and($doctorOutput)->not->toContain('doctor-secret-token')
         ->and($maintenanceExitCode)->toBe(2)
